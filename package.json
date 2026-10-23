@@ -4,7 +4,7 @@
   "description": "FTTH Survey & Design (SND) Fullstack Platform",
   "main": "api/index.js",
   "scripts": {
-    "build": "node backend/scripts/prepare-db.js && npx prisma generate --schema=backend/prisma/schema.prisma && npm --prefix frontend install && npm --prefix frontend run build"
+    "build": "node backend/scripts/prepare-db.js && npx prisma generate --schema=backend/prisma/schema.prisma && npm --prefix frontend install --include=dev && npm --prefix frontend run build"
   },
   "dependencies": {
     "@mlightcad/libredwg-web": "^0.8.1",
