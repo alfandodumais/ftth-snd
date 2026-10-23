@@ -260,6 +260,19 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'online',
+    service: 'FTTH SND Pro Backend API',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // ============================================================================
 // PUBLIC PAYMENT CONFIG & AUTHENTICATION ROUTES
 // ============================================================================
