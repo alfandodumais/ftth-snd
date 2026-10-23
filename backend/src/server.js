@@ -404,8 +404,8 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { identifier, password } = req.body;
-    if (!identifier || !password) {
-      return res.status(400).json({ message: 'Email/Username dan password wajib diisi.' });
+    if (!identifier) {
+      return res.status(400).json({ message: 'Email atau Username wajib diisi.' });
     }
 
     const cleanId = String(identifier).trim().toLowerCase();
@@ -417,11 +417,6 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (!user) {
       return res.status(401).json({ message: 'Kredensial tidak valid. Periksa kembali email/username Anda.' });
-    }
-
-    const validPass = await bcrypt.compare(password, user.passwordHash);
-    if (!validPass) {
-      return res.status(401).json({ message: 'Password yang Anda masukkan salah.' });
     }
 
     if (user.status === 'REJECTED') {
@@ -438,6 +433,38 @@ app.post('/api/auth/login', async (req, res) => {
         code: 'ACCOUNT_SUSPENDED',
         message: 'Akun Anda sedang dinonaktifkan sementara oleh Administrator.',
       });
+    }
+
+    // CEK APAKAH AKUN DI-RESET OLEH ADMIN
+    if (user.passwordResetRequired) {
+      const resetToken = jwt.sign(
+        { userId: user.id, username: user.username, purpose: 'PASSWORD_RESET' },
+        JWT_SECRET,
+        { expiresIn: '2h' }
+      );
+      return res.status(200).json({
+        requirePasswordReset: true,
+        resetToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          email: user.email,
+          role: user.role,
+          department: user.department,
+          region: user.region,
+        },
+        message: 'Akun Anda telah di-reset oleh Administrator. Silakan buat kata sandi baru untuk melanjutkan.',
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({ message: 'Password wajib diisi.' });
+    }
+
+    const validPass = await bcrypt.compare(password, user.passwordHash);
+    if (!validPass) {
+      return res.status(401).json({ message: 'Password yang Anda masukkan salah.' });
     }
 
     // If user is PENDING / UNPAID, return pending invoice so they can pay via DANA Bisnis QRIS & auto-activate!
@@ -501,6 +528,72 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ message: 'Terjadi kesalahan pada server saat login.' });
+  }
+});
+
+app.post('/api/auth/complete-reset-password', async (req, res) => {
+  try {
+    const { resetToken, newPassword } = req.body;
+    if (!resetToken) {
+      return res.status(400).json({ message: 'Token reset tidak valid atau telah kadaluarsa.' });
+    }
+    if (!newPassword || String(newPassword).length < 6) {
+      return res.status(400).json({ message: 'Kata sandi baru minimal harus 6 karakter.' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ message: 'Sesi reset kata sandi telah berakhir. Silakan login kembali untuk memulai ulang.' });
+    }
+
+    if (decoded.purpose !== 'PASSWORD_RESET' || !decoded.userId) {
+      return res.status(403).json({ message: 'Token reset tidak valid.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (!user) {
+      return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
+    }
+
+    const newHash = await bcrypt.hash(String(newPassword), 10);
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: newHash,
+        passwordResetRequired: false,
+        passwordResetAt: new Date(),
+        lastLoginAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'USER_PASSWORD_RESET_COMPLETED',
+        entityType: 'USER',
+        entityId: user.id,
+        details: JSON.stringify({ username: user.username, email: user.email }),
+        ipAddress: req.ip,
+      },
+    });
+
+    // Auto login: issue session token
+    const token = jwt.sign(
+      { userId: updatedUser.id, role: updatedUser.role, username: updatedUser.username },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      message: 'Kata sandi baru berhasil disimpan! Selamat datang kembali di GeoStudio SND.',
+      token,
+      user: sanitizeUser(updatedUser),
+    });
+  } catch (err) {
+    console.error('Complete reset password error:', err);
+    return res.status(500).json({ message: 'Gagal memperbarui kata sandi baru.' });
   }
 });
 
@@ -1080,6 +1173,47 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =
   } catch (err) {
     console.error('Delete user error:', err);
     return res.status(500).json({ message: 'Gagal menghapus pengguna.' });
+  }
+});
+
+app.post('/api/admin/users/:id/reset-password', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) {
+      return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        passwordResetRequired: true,
+        passwordResetAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'ADMIN_RESET_USER_PASSWORD',
+        entityType: 'USER',
+        entityId: id,
+        details: JSON.stringify({
+          targetUsername: target.username,
+          targetEmail: target.email,
+          targetFullName: target.fullName,
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    return res.json({
+      message: `Kata sandi untuk ${target.fullName} (@${target.username}) berhasil di-reset. Pengguna akan diminta menentukan kata sandi baru saat login berikutnya.`,
+      user: sanitizeUser(updated),
+    });
+  } catch (err) {
+    console.error('Admin reset password error:', err);
+    return res.status(500).json({ message: 'Gagal mereset kata sandi pengguna.' });
   }
 });
 

@@ -25,7 +25,10 @@ import {
   QrCode,
   Upload,
   CreditCard,
-  Save
+  Save,
+  KeyRound,
+  Lock,
+  Key
 } from 'lucide-react';
 import { apiFetch, downloadExcelFile } from '../api';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
@@ -85,6 +88,10 @@ export default function AdminDashboard({
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState('Data akun belum terverifikasi');
   const [rejectingUser, setRejectingUser] = useState(false);
+
+  // Reset Password Modal State
+  const [resetPasswordTarget, setResetPasswordTarget] = useState(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const notify = (msg, type = 'success') => {
     if (onShowToast) {
@@ -275,6 +282,25 @@ export default function AdminDashboard({
       notify(err.message, 'error');
     } finally {
       setDeletingUser(false);
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleConfirmResetPassword = async () => {
+    if (!resetPasswordTarget) return;
+    setResettingPassword(true);
+    setActionLoadingId(resetPasswordTarget.id);
+    try {
+      const res = await apiFetch(`/admin/users/${resetPasswordTarget.id}/reset-password`, {
+        method: 'POST',
+      });
+      notify(res.message || `Kata sandi untuk ${resetPasswordTarget.fullName} berhasil di-reset.`);
+      setResetPasswordTarget(null);
+      await loadAdminData();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setResettingPassword(false);
       setActionLoadingId(null);
     }
   };
@@ -865,6 +891,14 @@ export default function AdminDashboard({
                           APPROVED ({u.subscriptionStatus || 'ACTIVE'})
                         </span>
                       )}
+                      {u.passwordResetRequired && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 animate-pulse">
+                            <KeyRound className="w-2.5 h-2.5 text-indigo-400" />
+                            RESET AKTIF
+                          </span>
+                        </div>
+                      )}
                       {u.status === 'PENDING' && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse">
                           <Clock className="w-3.5 h-3.5" />
@@ -900,6 +934,22 @@ export default function AdminDashboard({
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {/* Tombol Reset Password */}
+                        <button
+                          type="button"
+                          onClick={() => setResetPasswordTarget(u)}
+                          disabled={actionLoadingId === u.id}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-semibold text-xs transition ${
+                            u.passwordResetRequired
+                              ? 'bg-indigo-500/25 border-indigo-500/50 text-indigo-200 shadow-sm shadow-indigo-500/20'
+                              : 'bg-slate-800 hover:bg-slate-700/80 border-slate-700 text-slate-300 hover:text-white'
+                          }`}
+                          title="Reset Kata Sandi Akun"
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>{u.passwordResetRequired ? 'Di-Reset' : 'Reset Sandi'}</span>
+                        </button>
+
                         {u.status !== 'APPROVED' && (
                           <button
                             onClick={() => handleApprove(u.id)}
@@ -1497,6 +1547,98 @@ export default function AdminDashboard({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          MODAL KONFIRMASI RESET PASSWORD PENGGUNA
+          ===================================================================== */}
+      {resetPasswordTarget && (
+        <div
+          className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 select-none"
+          onClick={() => {
+            if (!resettingPassword) setResetPasswordTarget(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-slate-900 border border-slate-700/90 rounded-3xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+            <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/35 flex items-center justify-center text-indigo-400 shrink-0">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">Reset Kata Sandi Akun</h3>
+                  <p className="text-[11px] text-slate-400">Verifikasi permintaan pembaruan kredensial</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={resettingPassword}
+                onClick={() => setResetPasswordTarget(null)}
+                className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">Akun Pengguna Target:</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    {resetPasswordTarget.role}
+                  </span>
+                </div>
+                <div className="text-sm font-extrabold text-white">{resetPasswordTarget.fullName}</div>
+                <div className="text-xs text-cyan-400 font-mono">
+                  @{resetPasswordTarget.username} • {resetPasswordTarget.email}
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {resetPasswordTarget.department || 'SND FTTH'} • {resetPasswordTarget.region || 'Regional'}
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex gap-3 text-xs text-indigo-200">
+                <KeyRound className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  Setelah di-reset, pengguna ini <strong>tidak dapat lagi menggunakan kata sandi lama</strong>. Saat pengguna memasukkan username atau email di halaman login, sistem akan secara otomatis mendeteksi status reset dan menampilkan formulir pembuatan kata sandi baru.
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={resettingPassword}
+                  onClick={() => setResetPasswordTarget(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={resettingPassword}
+                  onClick={handleConfirmResetPassword}
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/25 transition disabled:opacity-50"
+                >
+                  {resettingPassword ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Memproses...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>Konfirmasi Reset Sandi</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -36,6 +36,12 @@ model User {
   approvedAt            DateTime?
   rejectionReason       String?
   lastLoginAt           DateTime?
+
+  // Password Reset by Admin
+  passwordResetRequired Boolean              @default(false)
+  passwordResetAt       DateTime?
+  passwordResetToken    String?
+
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 
