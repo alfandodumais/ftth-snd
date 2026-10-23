@@ -7,10 +7,7 @@ import {
   ArrowLeft,
   AlertCircle,
   CheckCircle2,
-  ShieldCheck,
-  Sparkles,
   UserPlus,
-  KeyRound,
   QrCode
 } from 'lucide-react';
 import { apiFetch, setToken } from '../api';
@@ -63,18 +60,6 @@ export default function LoginPage({
     if (payData?.token && payData?.user) {
       setToken(payData.token);
       onLoginSuccess(payData.user);
-    }
-  };
-
-  const fillQuickCredentials = (roleType) => {
-    setError('');
-    setErrorCode('');
-    if (roleType === 'ADMIN') {
-      setIdentifier('admin');
-      setPassword('Admin123!');
-    } else {
-      setIdentifier('drafter');
-      setPassword('Drafter123!');
     }
   };
 
@@ -229,43 +214,6 @@ export default function LoginPage({
               <span>{loading ? 'Memverifikasi Kredensial...' : 'Masuk ke Dashboard SND'}</span>
             </button>
           </form>
-
-          {/* Quick-Fill Credentials Box */}
-          <div className="mt-6 pt-5 border-t border-slate-800">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 mb-2.5">
-              <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Akses Cepat Akun Terdaftar (Database Seed):</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => fillQuickCredentials('ADMIN')}
-                className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition"
-              >
-                <div className="text-[11px] font-bold text-purple-300 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Admin SND</span>
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  admin / Admin123!
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillQuickCredentials('DRAFTER')}
-                className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition"
-              >
-                <div className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Drafter Approved</span>
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  drafter / Drafter123!
-                </div>
-              </button>
-            </div>
-          </div>
 
           {/* Link to Register Page */}
           <div className="mt-6 pt-4 border-t border-slate-800/80 text-center text-xs text-slate-400">
