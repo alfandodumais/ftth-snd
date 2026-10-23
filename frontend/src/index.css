@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #02050c;
+  }
+}
+
+/* Custom sleek scrollbars for Excel preview tables */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+.excel-grid table {
+  border-collapse: collapse;
+}
+
+.excel-grid th,
+.excel-grid td {
+  border: 1px solid #cbd5e1;
+  font-family: Calibri, 'Inter', sans-serif;
+}
+
+/* ============================================================================
+   CINEMATIC EARTH COVER & ORBITAL FIBER ANIMATIONS
+   ============================================================================ */
+
+@keyframes earthSlowZoom {
+  0% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.09) translate3d(-10px, -6px, 0);
+  }
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+@keyframes orbitArcFlow {
+  0% {
+    stroke-dashoffset: 600;
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.15;
+  }
+}
+
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes atmospherePulse {
+  0%, 100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes shimmerGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-earth-cover {
+  animation: earthSlowZoom 32s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-orbit-arc {
+  stroke-dasharray: 90 510;
+  animation: orbitArcFlow 5.5s linear infinite;
+}
+
+.animate-orbit-arc-delayed {
+  stroke-dasharray: 70 530;
+  animation: orbitArcFlow 7s linear 2s infinite;
+}
+
+.animate-star-twinkle {
+  animation: starTwinkle 4s ease-in-out infinite;
+}
+
+.animate-atmosphere {
+  animation: atmospherePulse 6s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 5.5s ease-in-out infinite;
+}
+
+.animate-text-shimmer {
+  background-size: 200% auto;
+  animation: shimmerGradient 5s ease infinite;
+}

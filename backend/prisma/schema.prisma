@@ -1,0 +1,268 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String               @id @default(uuid())
+  email                 String               @unique
+  username              String               @unique
+  passwordHash          String
+  fullName              String
+  employeeId            String?
+  phone                 String?
+  department            String               @default("SND FTTH")
+  region                String?
+  role                  String               @default("DRAFTER") // ADMIN | SUPERVISOR | DRAFTER
+  status                String               @default("PENDING") // PENDING | APPROVED | REJECTED | SUSPENDED
+
+  // Subscription & Quota Fields
+  subscriptionPlan      String               @default("NONE")    // NONE | BASIC | PRO | ULTRA
+  subscriptionStatus    String               @default("UNPAID")  // UNPAID | ACTIVE | EXPIRED
+  subscriptionExpiresAt DateTime?
+  monthlyConvertLimit   Int                  @default(0)         // 10 (Basic), 30 (Pro), -1 (Ultra Unlimited)
+  monthlyConvertUsed    Int                  @default(0)
+  boqAccessAllowed      Boolean              @default(false)     // false for BASIC, true for PRO & ULTRA & ADMIN
+  billingCycleStart     DateTime?
+
+  approvedById          String?
+  approvedBy            User?                @relation("UserApprovals", fields: [approvedById], references: [id])
+  approvedUsers         User[]               @relation("UserApprovals")
+  approvedAt            DateTime?
+  rejectionReason       String?
+  lastLoginAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  projects              Project[]
+  auditLogs             AuditLog[]
+  exportHistories       ExportHistory[]
+  paymentTransactions   PaymentTransaction[]
+}
+
+model PaymentSetting {
+  id              String   @id @default("default")
+  merchantName    String   @default("TOSKA FTTH SND - DANA BISNIS")
+  merchantNmid    String   @default("ID1026000088991")
+  danaPhoneNumber String   @default("0812-3456-7890")
+  qrisImageUrl    String?  // Base64 or uploaded image URL of the Admin's DANA Bisnis QRIS barcode
+  qrisRawPayload  String?
+  autoVerifyMode  Boolean  @default(true)
+  webhookSecret   String   @default("whsec_dana_ftthsnd_2026")
+  basicPrice      Int      @default(100000)
+  basicLimit      Int      @default(10)
+  proPrice        Int      @default(250000)
+  proLimit        Int      @default(30)
+  ultraPrice      Int      @default(500000)
+  ultraLimit      Int      @default(-1)
+  updatedAt       DateTime @updatedAt
+}
+
+model PaymentTransaction {
+  id                String    @id @default(uuid())
+  invoiceNumber     String    @unique
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planCode          String    // BASIC | PRO | ULTRA
+  planName          String
+  baseAmount        Int
+  uniqueCode        Int
+  totalAmount       Int
+  paymentMethod     String    @default("QRIS_DANA_BISNIS")
+  status            String    @default("PENDING") // PENDING | PAID | EXPIRED | FAILED
+  externalReference String?
+  paidAt            DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime  @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+model Project {
+  id                String   @id @default(uuid())
+  clusterCode       String
+  clusterName       String
+  description       String?
+  oltName           String
+  feederCode        String
+  region            String
+  province          String
+  regencyCity       String
+  district          String
+  subdistrict       String
+  postalCode        String
+  fatAddress        String
+  addressPrefix     String   @default("JLN.")
+  street            String
+  netType           String   @default("Aerial")
+  dwellingType      String   @default("SDU")
+  homepassSource    String   @default("RFS")
+  installationType  String   @default("AE")
+  networkPresence   Int      @default(31)
+  rollOutId         String?
+  projectIdCode     String?
+  complexName       String?
+  kmzFileName       String
+  kmzFilePath       String
+  kmzFileSize       Int
+  boundaryCoordsJson String?
+
+  totalFdt          Int      @default(0)
+  totalFat          Int      @default(0)
+  totalHomepass     Int      @default(0)
+  totalUncoverHp    Int      @default(0)
+  totalPoles        Int      @default(0)
+  totalCableRouteM  Float    @default(0)
+  totalCableLengthM Float    @default(0)
+  totalSlingWireM   Float    @default(0)
+
+  createdById       String
+  createdBy         User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  fdts              ProjectFdt[]
+  fats              ProjectFat[]
+  homepasses        ProjectHomepass[]
+  poles             ProjectPole[]
+  exportHistories   ExportHistory[]
+}
+
+model ProjectFdt {
+  id               String   @id @default(uuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fdtIndex         Int      // 1, 2, 3, ...
+  sheetName        String   // "FDT 1", "FDT 2", ...
+  fdtId            String   // e.g. "KPBS-1.019"
+  fdtCapacity      String   @default("72C") // "48C" | "72C" | "96C" | "144C"
+  oltCode          String   // e.g. "KTG.100.0101"
+  oltName          String   // e.g. "KOTAMOBAGU BARAT"
+  latitude         Float
+  longitude        Float
+  coordString      String   // e.g. " 0.713482° 124.324661°"
+  distanceFromOlt  String   @default("m")
+  totalHp          Int      @default(0)
+  totalFat         Int      @default(0)
+
+  // BoM AE Route Quantities (in meters)
+  routeLineA24     Float    @default(0)
+  routeLineB24     Float    @default(0)
+  routeLineC24     Float    @default(0)
+  routeLineD24     Float    @default(0)
+  routeLineA36     Float    @default(0)
+  routeLineB36     Float    @default(0)
+  routeLineC36     Float    @default(0)
+  routeLineD36     Float    @default(0)
+  routeLineA48     Float    @default(0)
+  routeLineB48     Float    @default(0)
+  routeLineC48     Float    @default(0)
+  routeLineD48     Float    @default(0)
+
+  slingWireFormula String?  // e.g. "26+37+40+40+41+28+25"
+  slingWireRouteM  Float    @default(0)
+
+  // FAT counts per Line
+  fatCountLineA    Int      @default(0)
+  fatCountLineB    Int      @default(0)
+  fatCountLineC    Int      @default(0)
+  fatCountLineD    Int      @default(0)
+
+  // Pole counts per category
+  newPole7m5       Int      @default(0)
+  newPole7m4       Int      @default(0)
+  newPole7m3       Int      @default(0)
+  newPole7m25      Int      @default(0)
+  newPole9m5       Int      @default(0)
+  newPole9m4       Int      @default(0)
+  extPoleLn        Int      @default(0)
+  extPoleMti       Int      @default(0)
+  extPoleMr        Int      @default(0)
+
+  cableRoutesJson  String?  // Stores LineString coordinates for map visualization
+
+  fats             ProjectFat[]
+  homepasses       ProjectHomepass[]
+}
+
+model ProjectFat {
+  id            String            @id @default(uuid())
+  projectId     String
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fdtDbId       String
+  fdt           ProjectFdt        @relation(fields: [fdtDbId], references: [id], onDelete: Cascade)
+  orderIndex    Int               // 1..N within FDT
+  fatCode       String            // e.g. "A01", "B01"
+  fullFatName   String            // e.g. "KPBS-1.019.A01"
+  lineName      String            // e.g. "Line A"
+  lineCapacity  String            // e.g. "24C/2T"
+  fdtTray       String            // e.g. "G1", "G2", "G3", "G4"
+  fdtPort       Int               // 1..30
+  tubeColour    Int               // 1, 2, 3, 4
+  coreNumber1   Int               // odd core
+  coreNumber2   Int               // even core
+  latitude      Float
+  longitude     Float
+  poleId        String            // Matched nearest pole ID e.g. "EXT.MR.KTG.KPBD.P002"
+  poleLatitude  Float
+  poleLongitude Float
+  hpCount       Int               @default(0)
+  boundaryJson  String?           // Polygon coordinates for FAT boundary
+
+  homepasses    ProjectHomepass[]
+}
+
+model ProjectHomepass {
+  id         String     @id @default(uuid())
+  projectId  String
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fdtDbId    String
+  fdt        ProjectFdt @relation(fields: [fdtDbId], references: [id], onDelete: Cascade)
+  fatDbId    String
+  fat        ProjectFat @relation(fields: [fatDbId], references: [id], onDelete: Cascade)
+  fatPort    Int        // 1..16
+  homeNumber String     // e.g. "10", "252A"
+  latitude   Float
+  longitude  Float
+  block      String?
+  rt         String?
+  rw         String?
+}
+
+model ProjectPole {
+  id           String  @id @default(uuid())
+  projectId    String
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fdtIndex     Int
+  lineName     String
+  poleCategory String  // e.g. "NEW POLE 7-3", "EXISTING POLE EMR 7-4"
+  poleId       String  // e.g. "MR.KPBS.P002"
+  latitude     Float
+  longitude    Float
+  isAutoCad    Boolean @default(true)
+}
+
+model ExportHistory {
+  id         String   @id @default(uuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exportType String   // "HPDB" | "BOQ"
+  fileName   String
+  createdAt  DateTime @default(now())
+}
