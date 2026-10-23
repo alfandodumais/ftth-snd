@@ -47,6 +47,26 @@ async function main() {
     },
   });
 
+  // 3. Inisialisasi Pengaturan Pembayaran DANA Bisnis Default
+  await prisma.paymentSetting.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: {
+      id: 'default',
+      merchantName: 'TOSKA FTTH SND - DANA BISNIS',
+      merchantNmid: 'ID1026000088991',
+      danaPhoneNumber: '0812-3456-7890',
+      autoVerifyMode: true,
+      webhookSecret: 'whsec_dana_ftthsnd_2026',
+      basicPrice: 100000,
+      basicLimit: 10,
+      proPrice: 250000,
+      proLimit: 30,
+      ultraPrice: 500000,
+      ultraLimit: -1,
+    },
+  });
+
   // 3. Sinkronkan file CONTOH KMZ.kmz asli ke database jika belum ada proyek
   const existingProjects = await prisma.project.count();
   const sampleKmzPath = path.join(__dirname, '..', 'templates', 'CONTOH_KMZ.kmz');

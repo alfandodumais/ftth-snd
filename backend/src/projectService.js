@@ -166,6 +166,9 @@ async function createProjectFromKmz({
     }
 
     return proj;
+  }, {
+    maxWait: 30000,
+    timeout: 120000,
   });
 
   return getFullProjectById(createdProject.id);
