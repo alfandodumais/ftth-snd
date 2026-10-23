@@ -1,0 +1,28 @@
+{
+  "name": "ftth-snd-pro",
+  "version": "1.0.0",
+  "description": "FTTH Survey & Design (SND) Fullstack Platform",
+  "main": "api/index.js",
+  "scripts": {
+    "build": "cd backend && node scripts/prepare-db.js && npx prisma generate && cd ../frontend && npm install && npm run build"
+  },
+  "dependencies": {
+    "@mlightcad/libredwg-web": "^0.8.1",
+    "@prisma/client": "5.22.0",
+    "@tarikjabiri/dxf": "^2.9.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.1",
+    "fast-xml-parser": "^4.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "jszip": "^3.10.1",
+    "multer": "^1.4.5-lts.1",
+    "proj4": "^2.22.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "prisma": "5.22.0"
+  }
+}
