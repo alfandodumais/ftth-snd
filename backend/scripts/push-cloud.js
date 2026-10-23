@@ -29,11 +29,13 @@ try {
     env: { ...process.env, DATABASE_URL: cloudUrl },
   });
 
-  console.log('3. Melakukan seeding data awal (Akun Admin & Paket DANA) ke Cloud...');
-  execSync('node prisma/seed.js', {
-    stdio: 'inherit',
-    env: { ...process.env, DATABASE_URL: cloudUrl },
-  });
+  if (process.argv.includes('--seed')) {
+    console.log('3. Melakukan seeding data awal ke Cloud...');
+    execSync('node prisma/seed.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: cloudUrl },
+    });
+  }
 
   console.log('\n✅ Database Cloud Neon berhasil disiapkan!');
 } catch (err) {

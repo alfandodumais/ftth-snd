@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
-const { prisma, createProjectFromKmz } = require('../src/projectService');
+const { prisma } = require('../src/projectService');
 
 async function main() {
   console.log('Memulai inisialisasi database FTTH SND Pro...');
@@ -67,40 +67,7 @@ async function main() {
     },
   });
 
-  // 3. Sinkronkan file CONTOH KMZ.kmz asli ke database jika belum ada proyek
-  const existingProjects = await prisma.project.count();
-  const sampleKmzPath = path.join(__dirname, '..', 'templates', 'CONTOH_KMZ.kmz');
-
-  if (existingProjects === 0 && fs.existsSync(sampleKmzPath)) {
-    const stat = fs.statSync(sampleKmzPath);
-    const project = await createProjectFromKmz({
-      filePath: sampleKmzPath,
-      originalName: 'CONTOH KMZ.kmz',
-      fileSize: stat.size,
-      userId: admin.id,
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: admin.id,
-        action: 'PROJECT_UPLOAD_KMZ',
-        entityType: 'PROJECT',
-        entityId: project.id,
-        details: JSON.stringify({
-          fileName: 'CONTOH KMZ.kmz',
-          clusterCode: project.clusterCode,
-          clusterName: project.clusterName,
-          totalHomepass: project.totalHomepass,
-          totalFat: project.totalFat,
-        }),
-        ipAddress: '127.0.0.1',
-      },
-    });
-
-    console.log(`Berhasil mengekstrak & menyimpan proyek KMZ asli: ${project.clusterCode} - ${project.clusterName} (${project.totalHomepass} HP, ${project.totalFat} FAT)`);
-  }
-
-  console.log('Inisialisasi database selesai.');
+  console.log('Inisialisasi akun & konfigurasi database selesai.');
 }
 
 main()
