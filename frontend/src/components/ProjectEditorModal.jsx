@@ -32,10 +32,19 @@ export default function ProjectEditorModal({ project, onClose, onSaved }) {
       newPole7m3: f.newPole7m3 || 0,
       newPole7m4: f.newPole7m4 || 0,
       newPole9m4: f.newPole9m4 || 0,
-      extPoleMr: f.extPoleMr || 0
+      extPoleMr: f.extPoleMr || 0,
+      fats: (f.fats || []).map((fat) => ({
+        id: fat.id,
+        fatCode: fat.fatCode,
+        lineName: fat.lineName,
+        poleId: fat.poleId,
+        hpCount: fat.hpCount ?? (fat.homepasses ? fat.homepasses.length : 0),
+        fatAddress: fat.fatAddress || project.fatAddress || ''
+      }))
     }))
   });
 
+  const [bulkFatAddress, setBulkFatAddress] = useState(project.fatAddress || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,6 +54,35 @@ export default function ProjectEditorModal({ project, onClose, onSaved }) {
       nextFdts[idx] = { ...nextFdts[idx], [field]: val };
       return { ...prev, fdts: nextFdts };
     });
+  };
+
+  const handleFatAddressChange = (fdtIdx, fatIdx, val) => {
+    setForm((prev) => {
+      const nextFdts = [...prev.fdts];
+      const nextFats = [...(nextFdts[fdtIdx].fats || [])];
+      nextFats[fatIdx] = { ...nextFats[fatIdx], fatAddress: val };
+      nextFdts[fdtIdx] = { ...nextFdts[fdtIdx], fats: nextFats };
+      return { ...prev, fdts: nextFdts };
+    });
+  };
+
+  const handleApplyBulkFatAddress = () => {
+    if (!bulkFatAddress.trim()) return;
+    const trimmed = bulkFatAddress.trim();
+    const spaceIdx = trimmed.indexOf(' ');
+    const derivedStreet = spaceIdx >= 0 ? trimmed.slice(spaceIdx + 1).trim() : trimmed;
+    setForm((prev) => ({
+      ...prev,
+      fatAddress: trimmed,
+      street: derivedStreet,
+      fdts: prev.fdts.map((fdt) => ({
+        ...fdt,
+        fats: (fdt.fats || []).map((fat) => ({
+          ...fat,
+          fatAddress: trimmed
+        }))
+      }))
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -175,16 +213,7 @@ export default function ProjectEditorModal({ project, onClose, onSaved }) {
                 />
               </div>
               <div>
-                <label className="block text-slate-400 mb-1">FAT Address (Kolom L)</label>
-                <input
-                  type="text"
-                  value={form.fatAddress}
-                  onChange={(e) => setForm({ ...form, fatAddress: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">Street Name (Kolom AD)</label>
+                <label className="block text-slate-400 mb-1">Street Name Default (Kolom AD)</label>
                 <input
                   type="text"
                   value={form.street}
@@ -209,6 +238,85 @@ export default function ProjectEditorModal({ project, onClose, onSaved }) {
                   onChange={(e) => setForm({ ...form, feederCode: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
                 />
+              </div>
+            </div>
+
+            {/* Custom FAT Address per FAT (Kolom L) */}
+            <div className="mt-4 p-4 rounded-xl bg-slate-950 border border-cyan-500/30 space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div>
+                  <div className="text-xs font-bold text-cyan-300 flex items-center gap-2">
+                    <span>FAT Address Custom per FAT (Kolom L)</span>
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] text-cyan-300">
+                      Otomatis Sinkron Street (Kolom AD)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Atur alamat jalan (Kolom L) secara spesifik untuk masing-masing FAT (contoh: <code className="text-slate-300">Jl. Imam Bonjol</code>)
+                  </p>
+                </div>
+
+                {/* Quick Bulk Apply */}
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={bulkFatAddress}
+                    onChange={(e) => setBulkFatAddress(e.target.value)}
+                    placeholder="Isi cepat semua FAT..."
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs w-44 focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyBulkFatAddress}
+                    className="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold whitespace-nowrap transition"
+                  >
+                    Terapkan Semua
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {form.fdts.map((fdt, fdtIdx) => (
+                  <div key={fdt.id || fdtIdx} className="space-y-2">
+                    {form.fdts.length > 1 && (
+                      <div className="text-[11px] font-bold text-slate-300">
+                        {fdt.sheetName} — {fdt.fdtId}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {(fdt.fats || []).map((fat, fatIdx) => {
+                        const addrVal = fat.fatAddress || '';
+                        const spIdx = addrVal.indexOf(' ');
+                        const derivedStreet = spIdx >= 0 ? addrVal.slice(spIdx + 1).trim() : (addrVal || form.street);
+                        return (
+                          <div
+                            key={fat.id || `${fdtIdx}-${fat.fatCode}`}
+                            className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between gap-1 text-[11px]">
+                              <span className="font-extrabold text-emerald-400 font-mono">
+                                FAT {fat.fatCode}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {fat.lineName} • {fat.hpCount} HP
+                              </span>
+                            </div>
+                            <input
+                              type="text"
+                              value={addrVal}
+                              onChange={(e) => handleFatAddressChange(fdtIdx, fatIdx, e.target.value)}
+                              placeholder="Contoh: Jl. Imam Bonjol"
+                              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:outline-none text-white text-xs"
+                            />
+                            <div className="text-[10px] text-slate-500 truncate">
+                              Street (AD): <span className="text-slate-300 font-medium">{derivedStreet || '-'}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

@@ -228,6 +228,7 @@ model ProjectFat {
   poleLatitude  Float
   poleLongitude Float
   hpCount       Int               @default(0)
+  fatAddress    String?           // Custom FAT Address per FAT (Column L)
   boundaryJson  String?           // Polygon coordinates for FAT boundary
 
   homepasses    ProjectHomepass[]

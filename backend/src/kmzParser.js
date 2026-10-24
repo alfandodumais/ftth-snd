@@ -745,12 +745,16 @@ async function parseKmzFile(filePathOrBuffer) {
     primaryLon
   );
 
-  // Populate default RW and RT on homepasses
+  // Leave RW and RT blank (null) by default so user can fill them manually in Excel,
+  // and initialize per-FAT fatAddress with the default cluster fatAddress
   for (const fdt of finalizedFdts) {
     for (const fat of fdt.fats) {
+      if (!fat.fatAddress) {
+        fat.fatAddress = adminMeta.fatAddress || '';
+      }
       for (const hp of fat.homepasses) {
-        if (!hp.rw) hp.rw = adminMeta.defaultRw || '1';
-        if (!hp.rt) hp.rt = adminMeta.defaultRt || '4';
+        hp.rw = null;
+        hp.rt = null;
       }
     }
   }

@@ -1939,6 +1939,18 @@ app.put('/api/projects/:id', requireAuth, async (req, res) => {
               extPoleMr: f.extPoleMr !== undefined ? Number(f.extPoleMr) : undefined,
             },
           });
+
+          if (Array.isArray(f.fats)) {
+            for (const fatItem of f.fats) {
+              if (!fatItem.id) continue;
+              await tx.projectFat.update({
+                where: { id: fatItem.id },
+                data: {
+                  fatAddress: fatItem.fatAddress !== undefined ? String(fatItem.fatAddress).trim() : undefined,
+                },
+              });
+            }
+          }
         }
       }
     });

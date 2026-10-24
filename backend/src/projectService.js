@@ -143,6 +143,7 @@ async function createProjectFromKmz({
             poleLatitude: fat.poleLatitude,
             poleLongitude: fat.poleLongitude,
             hpCount: fat.hpCount,
+            fatAddress: fat.fatAddress || projectData.fatAddress || null,
             boundaryJson: fat.boundaryJson,
           },
         });
@@ -157,8 +158,8 @@ async function createProjectFromKmz({
               homeNumber: hp.homeNumber,
               latitude: hp.latitude,
               longitude: hp.longitude,
-              rw: hp.rw || null,
-              rt: hp.rt || null,
+              rw: null,
+              rt: null,
             })),
           });
         }

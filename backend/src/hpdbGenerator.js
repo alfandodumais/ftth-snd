@@ -69,14 +69,15 @@ const NO_FILL = {
 };
 
 /**
- * Helper to resolve FAT Address & Street per FAT (supports multi-street clusters like WAWOMBALATA RW 01 KENDARI)
+ * Helper to resolve FAT Address & Street per FAT (prioritizing custom fat.fatAddress per FAT)
  */
 function resolveFatAddressAndStreet(project, fdt, fat) {
-  let fatAddress = project.fatAddress || 'Jl. Imam Bonjol';
+  const customFatAddr = fat?.fatAddress ? String(fat.fatAddress).trim() : '';
+  let fatAddress = customFatAddr || project.fatAddress || 'Jl. Imam Bonjol';
   const fdtId = String(fdt?.fdtId || '').toUpperCase();
   const fatCode = String(fat?.fatCode || '').toUpperCase();
 
-  if (fdtId === 'WOMBA-01.011' || String(project.clusterName || '').toUpperCase().includes('WAWOMBALATA')) {
+  if (!customFatAddr && (fdtId === 'WOMBA-01.011' || String(project.clusterName || '').toUpperCase().includes('WAWOMBALATA'))) {
     if (fatCode.startsWith('B')) {
       fatAddress = 'Jl. Wawombalata';
     } else if (fatCode.startsWith('C')) {
@@ -93,18 +94,6 @@ function resolveFatAddressAndStreet(project, fdt, fat) {
 }
 
 /**
- * Helper to resolve default RW and RT for a project
- */
-function resolveDefaultRwRt(project) {
-  const upper = String(project.clusterName || '').toUpperCase();
-  const rwMatch = upper.match(/\bRW\s*0*(\d+)\b/i);
-  const rtMatch = upper.match(/\bRT\s*0*(\d+)\b/i);
-  const defaultRw = rwMatch ? parseInt(rwMatch[1], 10) : 1;
-  const defaultRt = rtMatch ? parseInt(rtMatch[1], 10) : 4;
-  return { defaultRw, defaultRt };
-}
-
-/**
  * Generates an ExcelJS Workbook matching CONTOH HPDB 2.xlsx 100%
  */
 async function generateHpdbWorkbook(project) {
@@ -117,7 +106,6 @@ async function generateHpdbWorkbook(project) {
   wb.created = new Date();
 
   const fdts = project.fdts || [];
-  const { defaultRw, defaultRt } = resolveDefaultRwRt(project);
 
   const sheetMaxRows = [];
 
@@ -370,11 +358,9 @@ async function generateHpdbWorkbook(project) {
         }
         row.getCell(26).value = { formula: `Y${r}`, result: project.clusterName };
 
-        // Columns AA, AB (27, 28): Rw, Rt
-        const rwVal = hp.rw !== null && hp.rw !== undefined && hp.rw !== '' ? hp.rw : defaultRw;
-        const rtVal = hp.rt !== null && hp.rt !== undefined && hp.rt !== '' ? hp.rt : defaultRt;
-        row.getCell(27).value = isNaN(Number(rwVal)) ? rwVal : Number(rwVal);
-        row.getCell(28).value = isNaN(Number(rtVal)) ? rtVal : Number(rtVal);
+        // Columns AA, AB (27, 28): Rw, Rt — left blank by default so Drafter fills manually
+        row.getCell(27).value = null;
+        row.getCell(28).value = null;
 
         // Columns AC (29): address_prefix, AD (30): street, AI (35): block
         const acVal = project.addressPrefix || 'JLN.';

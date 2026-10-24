@@ -79,11 +79,12 @@ function getTubeStyle(tubeColour) {
 }
 
 function resolveFatAddressAndStreet(project, fdt, fat) {
-  let fatAddress = project?.fatAddress || 'Jl. Imam Bonjol';
+  const customFatAddr = fat?.fatAddress ? String(fat.fatAddress).trim() : '';
+  let fatAddress = customFatAddr || project?.fatAddress || 'Jl. Imam Bonjol';
   const fdtId = String(fdt?.fdtId || '').toUpperCase();
   const fatCode = String(fat?.fatCode || '').toUpperCase();
 
-  if (fdtId === 'WOMBA-01.011' || String(project?.clusterName || '').toUpperCase().includes('WAWOMBALATA')) {
+  if (!customFatAddr && (fdtId === 'WOMBA-01.011' || String(project?.clusterName || '').toUpperCase().includes('WAWOMBALATA'))) {
     if (fatCode.startsWith('B')) {
       fatAddress = 'Jl. Wawombalata';
     } else if (fatCode.startsWith('C')) {
@@ -97,15 +98,6 @@ function resolveFatAddressAndStreet(project, fdt, fat) {
   const spaceIdx = fatAddress.indexOf(' ');
   const street = spaceIdx >= 0 ? fatAddress.slice(spaceIdx + 1).trim() : project?.street || fatAddress;
   return { fatAddress, street };
-}
-
-function resolveDefaultRwRt(project) {
-  const upper = String(project?.clusterName || '').toUpperCase();
-  const rwMatch = upper.match(/\bRW\s*0*(\d+)\b/i);
-  const rtMatch = upper.match(/\bRT\s*0*(\d+)\b/i);
-  const defaultRw = rwMatch ? parseInt(rwMatch[1], 10) : 1;
-  const defaultRt = rtMatch ? parseInt(rtMatch[1], 10) : 4;
-  return { defaultRw, defaultRt };
 }
 
 // Frozen left offsets for Row # (40px) + Columns A..H (1..8) matching CONTOH HPDB 2.xlsx xSplit=8
@@ -148,7 +140,6 @@ export default function HpdbExcelPreview({ project, onExportHpdb, exporting }) {
   const [editedHomeNumbers, setEditedHomeNumbers] = useState({});
 
   const activeFdt = fdts[activeFdtIdx] || fdts[0];
-  const { defaultRw, defaultRt } = useMemo(() => resolveDefaultRwRt(project), [project]);
 
   const availableLines = useMemo(() => {
     if (!activeFdt) return [];
@@ -629,10 +620,8 @@ export default function HpdbExcelPreview({ project, onExportHpdb, exporting }) {
                   const bfNorm = concatBf.trim().toUpperCase();
                   const isDuplicateBf = bfNorm !== '' && (bfCounts.get(bfNorm) || 0) > 1;
 
-                  const rwVal =
-                    hp.rw !== null && hp.rw !== undefined && hp.rw !== '' ? hp.rw : defaultRw;
-                  const rtVal =
-                    hp.rt !== null && hp.rt !== undefined && hp.rt !== '' ? hp.rt : defaultRt;
+                  const rwVal = '';
+                  const rtVal = '';
 
                   return (
                     <tr
