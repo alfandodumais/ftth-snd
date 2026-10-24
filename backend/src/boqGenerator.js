@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const JSZip = require('jszip');
+const ExcelJS = require('exceljs');
 
 const TEMPLATE_BOQ_PATH = path.join(__dirname, '..', 'templates', 'TEMPLATE_BOQ.xlsx');
 
@@ -637,7 +638,124 @@ async function generateBoqWorkbook(project) {
   };
 }
 
+function resolveExcelFillHex(fgColor) {
+  if (!fgColor) return null;
+  if (fgColor.argb) {
+    const hex = fgColor.argb.length === 8 ? fgColor.argb.slice(2) : fgColor.argb;
+    if (hex.toUpperCase() === 'FFFFFF') return '#FFFFFF';
+    return `#${hex}`;
+  }
+  if (fgColor.theme !== undefined) {
+    const t = fgColor.theme;
+    const tint = Number(fgColor.tint || 0);
+    if (t === 0 && tint < -0.2) return '#A6A6A6';
+    if (t === 2) return '#DDD9C4';
+    if (t === 3) return '#B8CCE4';
+    if (t === 5) return '#E6B8B7';
+    if (t === 8) return '#92CDDC';
+    if (t === 0) return '#FFFFFF';
+  }
+  return null;
+}
+
+async function extractBoqPreviewData(project) {
+  const wbWrapper = await generateBoqWorkbook(project);
+  const buf = await wbWrapper.xlsx.writeBuffer();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+
+  const extractSheet = (ws, maxCols, isAccountingZeroDash = false) => {
+    if (!ws) return [];
+    const rows = [];
+    for (let r = 1; r <= ws.rowCount; r++) {
+      const row = ws.getRow(r);
+      const cells = [];
+      let hasContent = false;
+
+      for (let c = 1; c <= maxCols; c++) {
+        const cell = row.getCell(c);
+        const raw = cell.value;
+        let formula = null;
+        let displayVal = raw;
+        let isFormula = false;
+
+        if (raw && typeof raw === 'object') {
+          if ('richText' in raw && Array.isArray(raw.richText)) {
+            displayVal = raw.richText.map((rt) => rt.text).join('');
+          } else if ('formula' in raw || 'sharedFormula' in raw) {
+            isFormula = true;
+            formula = raw.formula || raw.sharedFormula;
+            // Note: ExcelJS XML parser omits `result` when <v>0</v> is 0
+            if (raw.result !== undefined) {
+              displayVal = raw.result;
+              if (displayVal && typeof displayVal === 'object' && 'error' in displayVal) {
+                displayVal = displayVal.error;
+              }
+            } else {
+              displayVal = 0;
+            }
+          }
+        }
+
+        const bgHex = resolveExcelFillHex(cell.fill?.fgColor);
+        const hasBorder = Boolean(
+          cell.border &&
+            (cell.border.top || cell.border.bottom || cell.border.left || cell.border.right)
+        );
+
+        let formattedDisplay = displayVal ?? '';
+        let numericVal = typeof displayVal === 'number' ? displayVal : null;
+
+        if (isAccountingZeroDash && isFormula && displayVal === 0 && r >= 7 && c >= 4 && c <= 12) {
+          formattedDisplay = '-';
+        }
+
+        if (
+          (formattedDisplay !== '' && formattedDisplay !== null && formattedDisplay !== undefined) ||
+          (bgHex && bgHex !== '#FFFFFF')
+        ) {
+          hasContent = true;
+        }
+
+        cells.push({
+          col: c,
+          address: cell.address,
+          value: formattedDisplay,
+          numericVal,
+          formula,
+          bold: Boolean(cell.font?.bold),
+          bgHex,
+          hasBorder,
+          align: cell.alignment?.horizontal || null,
+        });
+      }
+
+      if (hasContent || r <= 15) {
+        rows.push({
+          rowNumber: r,
+          height: row.height || 18,
+          cells,
+        });
+      }
+    }
+    return rows;
+  };
+
+  const summarySheet = wb.getWorksheet('Summary PO Permit');
+  const nroSheet = wb.getWorksheet('BoQ NRO Cluster');
+  const feederSheet = wb.getWorksheet('BoQ NRO All Feeder');
+  const bomSheet = wb.getWorksheet('BoM AE');
+
+  return {
+    summaryPermitRows: extractSheet(summarySheet, 2, false),
+    nroClusterRows: extractSheet(nroSheet, 17, true),
+    nroFeederRows: extractSheet(feederSheet, 17, true),
+    bomAeRows: extractSheet(bomSheet, 20, false),
+  };
+}
+
 module.exports = {
   calculateBoqMetrics,
   generateBoqWorkbook,
+  extractBoqPreviewData,
 };

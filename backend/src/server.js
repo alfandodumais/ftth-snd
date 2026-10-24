@@ -10,7 +10,7 @@ const Tesseract = require('tesseract.js');
 
 const { prisma, createProjectFromKmz, getFullProjectById } = require('./projectService');
 const { generateHpdbWorkbook } = require('./hpdbGenerator');
-const { calculateBoqMetrics, generateBoqWorkbook } = require('./boqGenerator');
+const { calculateBoqMetrics, generateBoqWorkbook, extractBoqPreviewData } = require('./boqGenerator');
 const { convertDwgToKmz } = require('./dwgConverter');
 const { generateCadFromProject } = require('./kmzToDwgGenerator');
 const { parseKmzFile } = require('./kmzParser');
@@ -1774,59 +1774,8 @@ app.get('/api/projects/:id/boq-preview', requireAuth, async (req, res) => {
       });
     }
 
-    const wb = await generateBoqWorkbook(project);
-
-    const extractSheetRows = (ws, maxCols) => {
-      const rows = [];
-      for (let r = 1; r <= ws.rowCount; r++) {
-        const row = ws.getRow(r);
-        const cells = [];
-        let hasContent = false;
-        for (let c = 1; c <= maxCols; c++) {
-          const cell = row.getCell(c);
-          let raw = cell.value;
-          let formula = null;
-          let displayVal = raw;
-
-          if (raw && typeof raw === 'object') {
-            if ('richText' in raw && Array.isArray(raw.richText)) {
-              displayVal = raw.richText.map((rt) => rt.text).join('');
-            } else if ('formula' in raw || 'sharedFormula' in raw) {
-              formula = raw.formula || raw.sharedFormula;
-              displayVal = raw.result !== undefined ? raw.result : '';
-              if (displayVal && typeof displayVal === 'object' && 'error' in displayVal) {
-                displayVal = displayVal.error;
-              }
-            }
-          }
-
-          if (displayVal !== null && displayVal !== undefined && displayVal !== '') {
-            hasContent = true;
-          }
-
-          cells.push({
-            col: c,
-            address: cell.address,
-            value: displayVal ?? '',
-            formula,
-            bold: Boolean(cell.font?.bold),
-            fillArgb: cell.fill?.fgColor?.argb || null,
-          });
-        }
-        if (hasContent || r <= 15) {
-          rows.push({ rowNumber: r, cells });
-        }
-      }
-      return rows;
-    };
-
-    const nroSheet = wb.getWorksheet('BoQ NRO Cluster');
-    const bomSheet = wb.getWorksheet('BoM AE');
-
-    return res.json({
-      nroClusterRows: extractSheetRows(nroSheet, 17),
-      bomAeRows: extractSheetRows(bomSheet, 10),
-    });
+    const previewData = await extractBoqPreviewData(project);
+    return res.json(previewData);
   } catch (err) {
     console.error('BoQ preview error:', err);
     return res.status(500).json({ message: 'Gagal membuat preview lembar kerja BoQ.' });
