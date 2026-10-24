@@ -487,5 +487,4 @@ async function generateHpdbWorkbook(project) {
 module.exports = {
   generateHpdbWorkbook,
   resolveFatAddressAndStreet,
-  resolveDefaultRwRt,
 };
