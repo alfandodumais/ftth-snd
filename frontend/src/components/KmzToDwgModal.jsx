@@ -269,45 +269,58 @@ export default function KmzToDwgModal({ isOpen, onClose, initialFile = null }) {
                 </div>
               </div>
 
-              {/* Download Action Buttons: Dual Format DWG & DXF */}
+              {/* Download Action Buttons */}
               <div className="pt-2 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Button 1: Download DWG */}
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadCad(result.downloadDwgUrl || result.downloadDxfUrl)}
-                    className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 transition-all cursor-pointer group"
-                  >
-                    <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-                    <span>Download AutoCAD DWG (.dwg)</span>
-                  </button>
-
-                  {/* Button 2: Download DXF */}
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadCad(result.downloadDxfUrl)}
-                    className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-white font-extrabold text-xs border border-cyan-500/40 hover:border-cyan-400 shadow-md transition-all cursor-pointer group"
-                  >
-                    <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-                    <span>Download AutoCAD DXF (.dxf)</span>
-                  </button>
-                </div>
+                {result.downloadDwgUrl ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadCad(result.downloadDwgUrl)}
+                      className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 transition-all cursor-pointer group"
+                    >
+                      <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                      <span>Download Native DWG (.dwg)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadCad(result.downloadDxfUrl)}
+                      className="flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-white font-extrabold text-xs border border-cyan-500/40 hover:border-cyan-400 shadow-md transition-all cursor-pointer group"
+                    >
+                      <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                      <span>Download AutoCAD DXF (.dxf)</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadCad(result.downloadDxfUrl)}
+                      className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/25 transition-all cursor-pointer group"
+                    >
+                      <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                      <span>Download Gambar AutoCAD (.dxf)</span>
+                    </button>
+                  </div>
+                )}
 
                 {/* Info Card: Autodesk DXF & DWG Full Compatibility */}
-                <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-start gap-3 text-xs text-left">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/35 flex items-center justify-center text-cyan-400 shrink-0 mt-0.5">
-                    <FileCode2 className="w-4 h-4" />
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex items-start gap-3.5 text-xs text-left">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/35 flex items-center justify-center text-cyan-400 shrink-0 mt-0.5">
+                    <FileCode2 className="w-5 h-5" />
                   </div>
                   <div className="space-y-1.5 flex-1">
                     <div className="font-extrabold text-white flex items-center justify-between gap-2">
-                      <span>Dua Pilihan Format AutoCAD (DWG &amp; DXF)</span>
+                      <span>Format Resmi Gambar AutoCAD (Autodesk DXF R2018)</span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 whitespace-nowrap">
-                        AutoCAD 2018-2026
+                        100% AutoCAD Valid
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-relaxed">
-                      Kedua format gambar ini dapat <strong>langsung dibuka di AutoCAD, Civil 3D &amp; ZwCAD</strong>. Seluruh Layer FTTH SND, Simbol Tiang 7m/9m, FAT, FDT, jalur kabel metrik UTM WGS84, dan KOP Gambar terpetakan secara presisi dan siap di-plot/cetak.
+                      File <strong>.dxf</strong> adalah format gambar resmi buatan <strong>Autodesk</strong> yang dapat <strong>langsung dibuka di semua versi AutoCAD, Civil 3D &amp; ZwCAD</strong> (cukup klik 2x atau <em>File &gt; Open</em>). Seluruh Layer FTTH SND, Simbol Tiang, FAT, FDT, kabel metrik UTM WGS84, dan KOP Gambar terpetakan secara presisi dan <strong>tidak akan error</strong>.
                     </p>
+                    <div className="pt-1 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5">
+                      ⚠️ <strong>Penting:</strong> Jangan mengubah ekstensi <em>.dxf</em> menjadi <em>.dwg</em> secara manual, karena AutoCAD akan membaca file sebagai binary korup (<em>"Drawing file is not valid"</em>). Buka langsung file <strong>.dxf</strong> di AutoCAD, lalu tekan <strong>Ctrl + S (Save As DWG)</strong> jika ingin menyimpannya ke format binary .dwg.
+                    </div>
                   </div>
                 </div>
               </div>
