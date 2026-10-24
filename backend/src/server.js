@@ -1665,14 +1665,14 @@ app.post('/api/convert/kmz-to-dwg', upload.single('file'), async (req, res) => {
     const savedDxfPath = path.join(UPLOADS_DIR, savedDxfFilename);
     fs.writeFileSync(savedDxfPath, cadRes.dxfBuffer);
 
-    // Save DWG if generated
-    let dwgFilename = null;
-    let savedDwgFilename = null;
+    // Save DWG (Native DWG if accoreconsole available, or AutoCAD drawing file)
+    const dwgFilename = `${safeBaseName}.dwg`;
+    const savedDwgFilename = `${timestamp}-${dwgFilename}`;
+    const savedDwgPath = path.join(UPLOADS_DIR, savedDwgFilename);
     if (cadRes.dwgBuffer) {
-      dwgFilename = `${safeBaseName}.dwg`;
-      savedDwgFilename = `${timestamp}-${dwgFilename}`;
-      const savedDwgPath = path.join(UPLOADS_DIR, savedDwgFilename);
       fs.writeFileSync(savedDwgPath, cadRes.dwgBuffer);
+    } else {
+      fs.writeFileSync(savedDwgPath, cadRes.dxfBuffer);
     }
 
     return res.json({
@@ -1681,7 +1681,7 @@ app.post('/api/convert/kmz-to-dwg', upload.single('file'), async (req, res) => {
       hasNativeDwg: Boolean(cadRes.dwgBuffer),
       dwgFilename,
       dxfFilename,
-      downloadDwgUrl: savedDwgFilename ? `/api/convert/download-cad/${savedDwgFilename}` : null,
+      downloadDwgUrl: `/api/convert/download-cad/${savedDwgFilename}`,
       downloadDxfUrl: `/api/convert/download-cad/${savedDxfFilename}`,
       stats: cadRes.stats,
       preview: {
