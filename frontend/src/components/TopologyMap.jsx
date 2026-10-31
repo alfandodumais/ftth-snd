@@ -792,7 +792,12 @@ export default function TopologyMap({ project }) {
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-slate-950/80 border-b border-slate-800">
         <div className="flex flex-wrap items-center gap-1.5">
           {[
-            { key: 'boundary', label: 'Boundary FAT' },
+            {
+              key: 'boundary',
+              label: `Boundary FAT (${geoData.fatBoundaries.length})`,
+              color: '#ffff00',
+              activeClass: 'bg-[#ffff00]/15 border-white/70 text-[#fef08a] font-bold shadow-sm'
+            },
             ...cableLayerButtons,
             {
               key: 'slingWires',
@@ -1079,11 +1084,12 @@ export default function TopologyMap({ project }) {
                       key={`fb-${idx}`}
                       points={pts}
                       fill={
-                        isSatelliteActive ? 'rgba(16, 185, 129, 0.14)' : 'rgba(16, 185, 129, 0.05)'
+                        isSatelliteActive ? 'rgba(255, 255, 0, 0.22)' : 'rgba(255, 255, 0, 0.12)'
                       }
-                      stroke={isSatelliteActive ? '#34d399' : '#10b981'}
-                      strokeOpacity={isSatelliteActive ? 0.85 : 0.45}
-                      strokeWidth={1.2 / zoom}
+                      stroke="#ffffff"
+                      strokeOpacity={isSatelliteActive ? 0.95 : 0.85}
+                      strokeWidth={1.5 / zoom}
+                      strokeLinejoin="round"
                     />
                   );
                 })}
@@ -1627,6 +1633,15 @@ export default function TopologyMap({ project }) {
             />
             <span className="font-semibold text-[#ffff00]">
               FAT (Fiber Access Terminal #FFFF00) + Snapped Pole
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="w-3.5 h-2.5 rounded-sm border-[1.5px] border-white inline-block"
+              style={{ backgroundColor: 'rgba(255, 255, 0, 0.38)' }}
+            />
+            <span className="font-semibold text-yellow-200">
+              Boundary FAT (Garis Putih • Fill Kuning)
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
