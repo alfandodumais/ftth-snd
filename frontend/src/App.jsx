@@ -256,11 +256,8 @@ export default function App() {
 
   // Filtered projects for the Cluster List page
   const filteredProjects = useMemo(() => {
-    const q = clusterSearch.trim().toLowerCase();
+    const q = clusterSearch.trim().toLowerCase().replace(/^@/, '');
     return projects.filter((p) => {
-      if (user?.role === 'ADMIN' && adminUserFilter !== 'ALL') {
-        if (p.createdBy?.id !== adminUserFilter) return false;
-      }
       if (!q) return true;
       return (
         p.clusterName.toLowerCase().includes(q) ||
@@ -271,7 +268,7 @@ export default function App() {
         (p.createdBy?.username || '').toLowerCase().includes(q)
       );
     });
-  }, [projects, clusterSearch, adminUserFilter, user]);
+  }, [projects, clusterSearch]);
 
   const totalClusterPages = Math.max(1, Math.ceil(filteredProjects.length / clusterPageSize));
   const safeClusterPage = Math.min(clusterPage, totalClusterPages);
@@ -1518,45 +1515,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Admin Per-User Filter Bar (Only visible to ADMIN) */}
-              {user.role === 'ADMIN' && (
-                <div className="bg-slate-900/90 border border-purple-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <Users className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs font-bold text-white">
-                      Filter Cluster Berdasarkan Drafter / User:
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => setAdminUserFilter('ALL')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-                        adminUserFilter === 'ALL'
-                          ? 'bg-purple-600 border-purple-400 text-white'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Semua User ({projects.length})
-                    </button>
-                    {projectOwners.map((owner) => (
-                      <button
-                        key={owner.id}
-                        onClick={() => setAdminUserFilter(owner.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
-                          adminUserFilter === owner.id
-                            ? 'bg-purple-600 border-purple-400 text-white'
-                            : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        <User className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>{owner.fullName}</span>
-                        <span className="text-[10px] opacity-75">({owner.count})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Cluster Table Container */}
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
                 {/* Table Top Header & Search Toolbar */}
@@ -1583,13 +1541,23 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2.5">
+                    {clusterSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setClusterSearch('')}
+                        className="px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 transition flex items-center gap-1.5"
+                      >
+                        <span>Filter: &ldquo;{clusterSearch}&rdquo;</span>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <div className="relative">
                       <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         value={clusterSearch}
                         onChange={(e) => setClusterSearch(e.target.value)}
-                        placeholder="Cari kode / nama cluster / file KMZ..."
+                        placeholder="Cari kode / nama cluster / @username..."
                         className="pl-9 pr-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-64 transition"
                       />
                     </div>
@@ -1619,11 +1587,9 @@ export default function App() {
                         <thead>
                           <tr className="bg-slate-950/90 text-slate-400 border-b border-slate-800/90 text-[10px] font-bold uppercase tracking-wider">
                             <th className="py-3.5 px-4 w-12 text-center">No</th>
+                            <th className="py-3.5 px-4 whitespace-nowrap">Drafter / User</th>
                             <th className="py-3.5 px-4 min-w-[210px]">Kode &amp; Nama Cluster</th>
                             <th className="py-3.5 px-4 min-w-[220px]">File KMZ &amp; Wilayah</th>
-                            {user.role === 'ADMIN' && (
-                              <th className="py-3.5 px-4 whitespace-nowrap">Drafter</th>
-                            )}
                             <th className="py-3.5 px-4 text-center whitespace-nowrap">Homepass</th>
                             <th className="py-3.5 px-4 text-center whitespace-nowrap">Topologi FDT / FAT</th>
                             <th className="py-3.5 px-4 text-center whitespace-nowrap">Kabel FO &amp; Tiang</th>
@@ -1637,6 +1603,10 @@ export default function App() {
                           {paginatedProjects.map((p, idx) => {
                             const rowNum = (safeClusterPage - 1) * clusterPageSize + idx + 1;
                             const isCurrentActive = activeProjectId === p.id;
+                            const ownerUsername = p.createdBy?.username || user.username || 'user';
+                            const ownerAvatarChar = (ownerUsername || p.createdBy?.fullName || 'U')
+                              .charAt(0)
+                              .toUpperCase();
                             const createdDate = new Date(p.createdAt);
                             const dateStr = createdDate.toLocaleDateString('id-ID', {
                               day: '2-digit',
@@ -1663,6 +1633,23 @@ export default function App() {
                                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-bold text-slate-400">
                                     {rowNum}
                                   </span>
+                                </td>
+
+                                {/* Drafter / User (Circular Avatar + Username) */}
+                                <td className="py-4 px-4 align-middle whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => setClusterSearch(ownerUsername)}
+                                    title={`${p.createdBy?.fullName || ownerUsername} (@${ownerUsername})`}
+                                    className="inline-flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-slate-800/90 hover:border-cyan-500/40 transition shadow-sm group/user"
+                                  >
+                                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white shrink-0 shadow-md bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 ring-2 ring-cyan-500/30">
+                                      {ownerAvatarChar}
+                                    </div>
+                                    <span className="font-mono font-bold text-xs text-slate-200 group-hover/user:text-cyan-300 transition">
+                                      {ownerUsername}
+                                    </span>
+                                  </button>
                                 </td>
 
                                 {/* Kode & Nama Cluster */}
@@ -1694,18 +1681,6 @@ export default function App() {
                                     {p.subdistrict}, {p.regencyCity} ({p.province})
                                   </div>
                                 </td>
-
-                                {/* Drafter (Admin Only) */}
-                                {user.role === 'ADMIN' && (
-                                  <td className="py-4 px-4 align-middle whitespace-nowrap">
-                                    <div className="font-bold text-cyan-300 text-xs">
-                                      {p.createdBy?.fullName || 'Drafter'}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                                      @{p.createdBy?.username} • {p.createdBy?.department || 'SND'}
-                                    </div>
-                                  </td>
-                                )}
 
                                 {/* Homepass Badge (Single Line No-Wrap) */}
                                 <td className="py-4 px-4 text-center align-middle whitespace-nowrap">

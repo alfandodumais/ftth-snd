@@ -426,30 +426,37 @@ export default function AdminDashboard({
     );
   });
 
-  // Flatten or group clusters by user for the Per-User Cluster Monitoring tab
-  const displayedUserGroups = useMemo(() => {
-    const q = clusterSearch.trim().toLowerCase();
-    return users
-      .filter((u) => selectedUserId === 'ALL' || u.id === selectedUserId)
-      .map((u) => {
-        const userClusters = (u.projects || []).filter((p) => {
-          if (!q) return true;
-          return (
-            p.clusterName.toLowerCase().includes(q) ||
-            p.clusterCode.toLowerCase().includes(q) ||
+  // Flatten all clusters across all users into a single unified chronological list
+  const allFilteredClusters = useMemo(() => {
+    const q = clusterSearch.trim().toLowerCase().replace(/^@/, '');
+    const list = [];
+    for (const u of users) {
+      for (const p of u.projects || []) {
+        if (q) {
+          const match =
+            (p.clusterName || '').toLowerCase().includes(q) ||
+            (p.clusterCode || '').toLowerCase().includes(q) ||
             (p.kmzFileName || '').toLowerCase().includes(q) ||
-            (p.regencyCity || '').toLowerCase().includes(q)
-          );
+            (p.regencyCity || '').toLowerCase().includes(q) ||
+            (p.province || '').toLowerCase().includes(q) ||
+            (u.username || '').toLowerCase().includes(q) ||
+            (u.fullName || '').toLowerCase().includes(q);
+          if (!match) continue;
+        }
+        list.push({
+          ...p,
+          owner: u
         });
-        const totalHp = userClusters.reduce((acc, p) => acc + (p.totalHomepass || 0), 0);
-        return {
-          user: u,
-          clusters: userClusters,
-          totalHp
-        };
-      })
-      .filter((group) => selectedUserId !== 'ALL' || group.clusters.length > 0 || !q);
-  }, [users, selectedUserId, clusterSearch]);
+      }
+    }
+    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return list;
+  }, [users, clusterSearch]);
+
+  const totalFilteredHp = useMemo(
+    () => allFilteredClusters.reduce((acc, c) => acc + (c.totalHomepass || 0), 0),
+    [allFilteredClusters]
+  );
 
   const pendingCount = users.filter((u) => u.status === 'PENDING').length;
 
@@ -589,262 +596,254 @@ export default function AdminDashboard({
       </div>
 
       {/* =====================================================================
-          TAB 1: MONITORING CLUSTER PER USER / DRAFTER
+          TAB 1: MONITORING CLUSTER PER USER / DRAFTER (UNIFIED SINGLE TABLE)
           ===================================================================== */}
       {adminTab === 'USER_CLUSTERS' && (
-        <div className="space-y-5">
-          {/* User Selector Pills & Search */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+          {/* Unified Table Header & Search Bar */}
+          <div className="px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 shadow-inner">
+                <FolderKanban className="w-5 h-5" />
+              </div>
               <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Users className="w-4 h-4 text-cyan-400" />
-                  <span>Filter &amp; Lihat Hasil Convert KMZ Per User / Drafter</span>
-                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-white tracking-tight">
+                    Monitoring Seluruh Cluster Hasil Convert KMZ
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
+                    {allFilteredClusters.length} Cluster
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                    {totalFilteredHp.toLocaleString()} Total HP
+                  </span>
+                </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Pilih nama Drafter di bawah untuk melihat daftar cluster KMZ yang telah dikonversi oleh user tersebut
+                  Daftar terpadu seluruh file cluster KMZ yang dikonversi oleh semua Drafter &amp; Admin (diurutkan dari terbaru)
                 </p>
               </div>
+            </div>
 
+            <div className="flex flex-wrap items-center gap-2.5">
+              {clusterSearch && (
+                <button
+                  type="button"
+                  onClick={() => setClusterSearch('')}
+                  className="px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 transition flex items-center gap-1.5"
+                >
+                  <span>Filter: &ldquo;{clusterSearch}&rdquo;</span>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={clusterSearch}
                   onChange={(e) => setClusterSearch(e.target.value)}
-                  placeholder="Cari nama cluster / kode / kota..."
-                  className="pl-8 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-64"
+                  placeholder="Cari cluster, kode, kota, @username..."
+                  className="pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-72 transition"
                 />
+                {clusterSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setClusterSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    title="Reset Pencarian"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-            </div>
-
-            {/* Horizontal User Filter Cards */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-1">
-              <button
-                onClick={() => setSelectedUserId('ALL')}
-                className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-2 ${
-                  selectedUserId === 'ALL'
-                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md'
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Semua User ({stats?.totalProjects ?? 0} Cluster)</span>
-              </button>
-
-              {users
-                .filter((u) => u.status === 'APPROVED')
-                .map((u) => {
-                  const count = u.projects?.length || 0;
-                  const isSel = selectedUserId === u.id;
-                  return (
-                    <button
-                      key={u.id}
-                      onClick={() => setSelectedUserId(u.id)}
-                      className={`px-3.5 py-2 rounded-xl border text-xs font-semibold transition flex items-center gap-2 ${
-                        isSel
-                          ? 'bg-cyan-500/20 border-cyan-400 text-white shadow-md'
-                          : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
-                      }`}
-                    >
-                      <User className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>{u.fullName}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">@{u.username}</span>
-                      <span
-                        className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                          count > 0
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-slate-800 text-slate-400'
-                        }`}
-                      >
-                        {count} Cluster
-                      </span>
-                    </button>
-                  );
-                })}
             </div>
           </div>
 
-          {/* Per-User Cluster Groups */}
-          {displayedUserGroups.map(({ user: u, clusters, totalHp }) => (
-            <div
-              key={u.id}
-              className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl"
-            >
-              {/* User Group Header */}
-              <div className="px-6 py-4 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-extrabold text-sm">
-                    {u.fullName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-extrabold text-white">{u.fullName}</span>
-                      <span className="text-xs font-mono text-cyan-400">@{u.username}</span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          u.role === 'ADMIN'
-                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                            : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                        }`}
-                      >
-                        {u.role}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {u.department || 'SND FTTH'} • Area: <strong>{u.region || '-'}</strong> • Email: {u.email}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs">
-                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
-                    <span className="text-slate-400">Total Dikonversi: </span>
-                    <strong className="text-cyan-300">{clusters.length} Cluster</strong>
-                  </div>
-                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
-                    <span className="text-slate-400">Total Homepass: </span>
-                    <strong className="text-emerald-400">{totalHp.toLocaleString()} HP</strong>
-                  </div>
-                </div>
+          {/* Unified Clusters Table */}
+          {allFilteredClusters.length === 0 ? (
+            <div className="p-12 text-center space-y-2">
+              <FolderKanban className="w-10 h-10 text-slate-600 mx-auto" />
+              <div className="text-sm font-bold text-white">
+                {clusterSearch
+                  ? `Tidak ditemukan cluster untuk pencarian "${clusterSearch}"`
+                  : 'Belum ada file cluster KMZ yang dikonversi'}
               </div>
-
-              {/* User's Converted Clusters Table */}
-              {clusters.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-500">
-                  User <strong>{u.fullName}</strong> belum mengonversi file cluster KMZ apa pun.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-950/80 text-slate-400 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider">
-                        <th className="py-3.5 px-4 w-12 text-center">No</th>
-                        <th className="py-3.5 px-4 min-w-[200px]">Kode &amp; Nama Cluster</th>
-                        <th className="py-3.5 px-4 min-w-[210px]">File KMZ &amp; Wilayah</th>
-                        <th className="py-3.5 px-4 text-center whitespace-nowrap">Homepass</th>
-                        <th className="py-3.5 px-4 text-center whitespace-nowrap">Topologi FDT / FAT</th>
-                        <th className="py-3.5 px-4 text-center whitespace-nowrap">Kabel FO &amp; Tiang</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap">Waktu Convert</th>
-                        <th className="py-3.5 px-5 text-right whitespace-nowrap">Aksi Admin</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/70">
-                      {clusters.map((c, idx) => {
-                        const createdDate = new Date(c.createdAt);
-                        const dateStr = createdDate.toLocaleDateString('id-ID', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric'
-                        });
-                        const timeStr = createdDate.toLocaleTimeString('id-ID', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit'
-                        });
-
-                        return (
-                          <tr key={c.id} className="hover:bg-slate-800/40 transition">
-                            <td className="py-3.5 px-4 text-center align-middle">
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-bold text-slate-400">
-                                {idx + 1}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 align-middle">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 whitespace-nowrap">
-                                {c.clusterCode}
-                              </span>
-                              <div className="font-extrabold text-white mt-1.5">{c.clusterName}</div>
-                            </td>
-                            <td className="py-3.5 px-4 align-middle">
-                              <div
-                                className="font-mono text-[11px] text-slate-200 truncate max-w-[230px]"
-                                title={c.kmzFileName}
-                              >
-                                {c.kmzFileName}
-                              </div>
-                              <div className="text-[11px] text-slate-400 mt-1 truncate max-w-[230px]">
-                                {c.regencyCity} ({c.province})
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
-                              <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 font-extrabold text-xs whitespace-nowrap">
-                                <Home className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <span>{(c.totalHomepass || 0).toLocaleString()} HP</span>
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
-                              <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                                <span className="px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[11px] whitespace-nowrap">
-                                  {c.totalFdt} FDT
-                                </span>
-                                <span className="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-bold text-[11px] whitespace-nowrap">
-                                  {c.totalFat} FAT
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
-                              <div className="font-extrabold text-amber-400 whitespace-nowrap">
-                                {(c.totalCableLengthM || 0).toLocaleString()} m FO
-                              </div>
-                              <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
-                                {c.totalPoles} Tiang
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                              <div className="text-slate-200 font-semibold text-[11px] whitespace-nowrap">
-                                {dateStr}
-                              </div>
-                              <div className="text-slate-500 font-mono text-[10px] mt-0.5 whitespace-nowrap">
-                                {timeStr}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-5 text-right align-middle whitespace-nowrap">
-                              <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
-                                <button
-                                  onClick={() => onInspectProject && onInspectProject(c.id)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-[11px] transition whitespace-nowrap"
-                                  title="Buka & Lihat Detail Spreadsheet Cluster Ini"
-                                >
-                                  <Eye className="w-3.5 h-3.5 shrink-0" />
-                                  <span>Buka Preview</span>
-                                </button>
-                                <button
-                                  onClick={() => handleAdminDownload(c, 'hpdb')}
-                                  disabled={downloadingKey === `${c.id}-hpdb`}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
-                                  title="Download Excel HPDB"
-                                >
-                                  <Download className="w-3.5 h-3.5 shrink-0" />
-                                  <span>HPDB.xlsx</span>
-                                </button>
-                                <button
-                                  onClick={() => handleAdminDownload(c, 'boq')}
-                                  disabled={downloadingKey === `${c.id}-boq`}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
-                                  title="Download Excel BoQ"
-                                >
-                                  <Download className="w-3.5 h-3.5 shrink-0" />
-                                  <span>BOQ.xlsx</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteCluster(c, u)}
-                                  className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/25 border border-red-500/25 text-red-400 transition shrink-0"
-                                  title="Hapus Cluster Ini"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <p className="text-xs text-slate-500">
+                Seluruh hasil konversi KMZ dari setiap Drafter akan otomatis tampil di tabel ini.
+              </p>
             </div>
-          ))}
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-950/90 text-slate-400 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider">
+                    <th className="py-3.5 px-4 w-12 text-center">No</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Drafter / User</th>
+                    <th className="py-3.5 px-4 min-w-[200px]">Kode &amp; Nama Cluster</th>
+                    <th className="py-3.5 px-4 min-w-[210px]">File KMZ &amp; Wilayah</th>
+                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Homepass</th>
+                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Topologi FDT / FAT</th>
+                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Kabel FO &amp; Tiang</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Waktu Convert</th>
+                    <th className="py-3.5 px-5 text-right whitespace-nowrap">Aksi Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70">
+                  {allFilteredClusters.map((c, idx) => {
+                    const u = c.owner || {};
+                    const isOwnerAdmin = u.role === 'ADMIN';
+                    const avatarChar = (u.username || u.fullName || 'U').charAt(0).toUpperCase();
+                    const createdDate = new Date(c.createdAt);
+                    const dateStr = createdDate.toLocaleDateString('id-ID', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    });
+                    const timeStr = createdDate.toLocaleTimeString('id-ID', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    });
+
+                    return (
+                      <tr key={c.id} className="hover:bg-slate-800/40 transition group">
+                        {/* No */}
+                        <td className="py-3.5 px-4 text-center align-middle">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-bold text-slate-400">
+                            {idx + 1}
+                          </span>
+                        </td>
+
+                        {/* Drafter / User (Circular Avatar + Username Only) */}
+                        <td className="py-3.5 px-4 align-middle whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setClusterSearch(u.username || '')}
+                            title={`Klik untuk filter user: ${u.fullName || u.username} (@${u.username})`}
+                            className="inline-flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-slate-800/90 hover:border-cyan-500/40 transition shadow-sm group/user"
+                          >
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white shrink-0 shadow-md ${
+                                isOwnerAdmin
+                                  ? 'bg-gradient-to-br from-purple-500 via-indigo-600 to-blue-600 ring-2 ring-purple-500/30'
+                                  : 'bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 ring-2 ring-cyan-500/30'
+                              }`}
+                            >
+                              {avatarChar}
+                            </div>
+                            <span className="font-mono font-bold text-xs text-slate-200 group-hover/user:text-cyan-300 transition">
+                              {u.username || 'user'}
+                            </span>
+                          </button>
+                        </td>
+
+                        {/* Kode & Nama Cluster */}
+                        <td className="py-3.5 px-4 align-middle">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 whitespace-nowrap">
+                            {c.clusterCode}
+                          </span>
+                          <div className="font-extrabold text-white mt-1.5 leading-snug">
+                            {c.clusterName}
+                          </div>
+                        </td>
+
+                        {/* File KMZ & Wilayah */}
+                        <td className="py-3.5 px-4 align-middle">
+                          <div
+                            className="font-mono text-[11px] text-slate-200 truncate max-w-[230px]"
+                            title={c.kmzFileName}
+                          >
+                            {c.kmzFileName}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-1 truncate max-w-[230px]">
+                            {c.regencyCity} ({c.province})
+                          </div>
+                        </td>
+
+                        {/* Homepass */}
+                        <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 font-extrabold text-xs whitespace-nowrap">
+                            <Home className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>{(c.totalHomepass || 0).toLocaleString()} HP</span>
+                          </span>
+                        </td>
+
+                        {/* Topologi FDT / FAT */}
+                        <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                            <span className="px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[11px] whitespace-nowrap">
+                              {c.totalFdt} FDT
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-bold text-[11px] whitespace-nowrap">
+                              {c.totalFat} FAT
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Kabel FO & Tiang */}
+                        <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
+                          <div className="font-extrabold text-amber-400 whitespace-nowrap">
+                            {(c.totalCableLengthM || 0).toLocaleString()} m FO
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
+                            {c.totalPoles} Tiang
+                          </div>
+                        </td>
+
+                        {/* Waktu Convert */}
+                        <td className="py-3.5 px-4 align-middle whitespace-nowrap">
+                          <div className="text-slate-200 font-semibold text-[11px] whitespace-nowrap">
+                            {dateStr}
+                          </div>
+                          <div className="text-slate-500 font-mono text-[10px] mt-0.5 whitespace-nowrap">
+                            {timeStr}
+                          </div>
+                        </td>
+
+                        {/* Aksi Admin */}
+                        <td className="py-3.5 px-5 text-right align-middle whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              onClick={() => onInspectProject && onInspectProject(c.id)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-[11px] transition whitespace-nowrap"
+                              title="Buka & Lihat Detail Spreadsheet Cluster Ini"
+                            >
+                              <Eye className="w-3.5 h-3.5 shrink-0" />
+                              <span>Buka Preview</span>
+                            </button>
+                            <button
+                              onClick={() => handleAdminDownload(c, 'hpdb')}
+                              disabled={downloadingKey === `${c.id}-hpdb`}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
+                              title="Download Excel HPDB"
+                            >
+                              <Download className="w-3.5 h-3.5 shrink-0" />
+                              <span>HPDB.xlsx</span>
+                            </button>
+                            <button
+                              onClick={() => handleAdminDownload(c, 'boq')}
+                              disabled={downloadingKey === `${c.id}-boq`}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
+                              title="Download Excel BoQ"
+                            >
+                              <Download className="w-3.5 h-3.5 shrink-0" />
+                              <span>BOQ.xlsx</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCluster(c, u)}
+                              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/25 border border-red-500/25 text-red-400 transition shrink-0"
+                              title="Hapus Cluster Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -1004,7 +1003,7 @@ export default function AdminDashboard({
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedUserId(u.id);
+                          setClusterSearch(u.username || '');
                           setAdminTab('USER_CLUSTERS');
                         }}
                         className="font-bold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
