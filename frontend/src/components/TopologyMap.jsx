@@ -123,7 +123,7 @@ export default function TopologyMap({ project }) {
   const [rotation, setRotation] = useState(0);
   const [satBrightness, setSatBrightness] = useState(0.88);
   const [showAllLabels, setShowAllLabels] = useState(false);
-  const [textSizePreset, setTextSizePreset] = useState(1.25);
+  const [textSizePreset, setTextSizePreset] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tileFallback, setTileFallback] = useState(false);
 
