@@ -129,6 +129,8 @@ export default function TopologyMap({ project }) {
   // Interactive Distance Measurement (Ruler ala Google Earth)
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
+  const [draggingMeasureIdx, setDraggingMeasureIdx] = useState(null);
+  const [hoveredMeasureIdx, setHoveredMeasureIdx] = useState(null);
   const [cursorGps, setCursorGps] = useState(null);
 
   const [layers, setLayers] = useState({
@@ -503,6 +505,45 @@ export default function TopologyMap({ project }) {
     return { vx, vy, lx, ly };
   };
 
+  // Snap measurement point to nearest FDT / FAT / Pole / Homepass if within 6.5 screen pixels (unless Shift is held)
+  const resolveSnappedMeasurePoint = (lx, ly, disableSnap = false) => {
+    if (!disableSnap && geoData) {
+      const snapRadius = 6.5 / zoom;
+      let bestDist = snapRadius;
+      let bestNode = null;
+
+      const checkNode = (lat, lon, label) => {
+        if (typeof lat !== 'number' || typeof lon !== 'number') return;
+        const [nx, ny] = projectPoint(lat, lon);
+        const d = Math.hypot(nx - lx, ny - ly);
+        if (d < bestDist) {
+          bestDist = d;
+          bestNode = { lat, lon, x: nx, y: ny, snapLabel: label };
+        }
+      };
+
+      if (layers.fdts) {
+        geoData.fdts.forEach((f) => checkNode(f.latitude, f.longitude, f.fdtId || f.sheetName));
+      }
+      if (layers.fats) {
+        geoData.fats.forEach((f) => checkNode(f.latitude, f.longitude, `FAT ${f.fatCode}`));
+      }
+      if (layers.poles) {
+        geoData.poles.forEach((p) => checkNode(p.latitude, p.longitude, p.poleId || 'Tiang'));
+      }
+      if (layers.homepasses) {
+        geoData.homepasses.forEach((h) =>
+          checkNode(h.latitude, h.longitude, `HP ${h.homeNumber}`)
+        );
+      }
+
+      if (bestNode) return bestNode;
+    }
+
+    const gps = unprojectPoint(lx, ly);
+    return { ...gps, x: lx, y: ly, snapLabel: null };
+  };
+
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
     setIsDragging(true);
@@ -513,19 +554,31 @@ export default function TopologyMap({ project }) {
     const pt = svgPointFromEvent(e);
     if (pt) {
       setCursorGps(unprojectPoint(pt.lx, pt.ly));
+      if (draggingMeasureIdx !== null) {
+        const updatedPt = resolveSnappedMeasurePoint(pt.lx, pt.ly, e.shiftKey);
+        setMeasurePoints((prev) =>
+          prev.map((item, idx) => (idx === draggingMeasureIdx ? updatedPt : item))
+        );
+        return;
+      }
     }
     if (!isDragging) return;
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
 
   const handleMouseUp = (e) => {
+    if (draggingMeasureIdx !== null) {
+      setDraggingMeasureIdx(null);
+      setIsDragging(false);
+      return;
+    }
     if (isDragging && measureMode && dragStart.rawX !== undefined) {
       const moved = Math.hypot(e.clientX - dragStart.rawX, e.clientY - dragStart.rawY);
       if (moved < 5) {
         const pt = svgPointFromEvent(e);
         if (pt) {
-          const gps = unprojectPoint(pt.lx, pt.ly);
-          setMeasurePoints((prev) => [...prev, { ...gps, x: pt.lx, y: pt.ly }]);
+          const newPt = resolveSnappedMeasurePoint(pt.lx, pt.ly, e.shiftKey);
+          setMeasurePoints((prev) => [...prev, newPt]);
         }
       }
     }
@@ -767,31 +820,44 @@ export default function TopologyMap({ project }) {
             type="button"
             onClick={() => {
               setMeasureMode((m) => !m);
-              if (measureMode) setMeasurePoints([]);
             }}
             className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition flex items-center gap-1 ${
               measureMode
                 ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300'
                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
             }`}
-            title="Ukur jarak antar titik dari atas seperti Penggaris Google Earth"
+            title="Ukur jarak antar titik dari atas seperti Penggaris Google Earth (Titik ukur bisa digeser)"
           >
             <Ruler className="w-3 h-3" />
             <span>
-              {measureMode
+              {measureMode || measurePoints.length > 0
                 ? `Ukur: ${totalMeasuredMeters.toFixed(1)} m`
                 : 'Ukur Jarak'}
             </span>
           </button>
 
-          {measureMode && measurePoints.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setMeasurePoints([])}
-              className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25"
-            >
-              Reset Ukur
-            </button>
+          {measurePoints.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setMeasurePoints((prev) => prev.slice(0, -1))}
+                className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25"
+                title="Hapus titik ukur terakhir"
+              >
+                ↶ Undo Titik
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMeasurePoints([]);
+                  setDraggingMeasureIdx(null);
+                }}
+                className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25"
+                title="Hapus semua titik pengukuran jarak"
+              >
+                Reset Ukur
+              </button>
+            </>
           )}
 
           {/* Satellite Brightness Cycle */}
@@ -884,7 +950,9 @@ export default function TopologyMap({ project }) {
             ref={svgRef}
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
             className={`w-full h-full ${
-              measureMode
+              draggingMeasureIdx !== null
+                ? 'cursor-grabbing'
+                : measureMode
                 ? 'cursor-crosshair'
                 : isDragging
                 ? 'cursor-grabbing'
@@ -893,7 +961,10 @@ export default function TopologyMap({ project }) {
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onMouseLeave={() => setIsDragging(false)}
+            onMouseLeave={() => {
+              setIsDragging(false);
+              setDraggingMeasureIdx(null);
+            }}
           >
             <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
               {/* 0. GOOGLE EARTH SATELLITE / HYBRID / STREET TILES (1:1 TOP-DOWN OVERHEAD) */}
@@ -1284,50 +1355,150 @@ export default function TopologyMap({ project }) {
                   );
                 })}
 
-              {/* 7. Interactive Ruler / Measure Distance Overlay */}
+              {/* 7. Interactive Ruler / Measure Distance Overlay (Draggable Points + Midpoint Insertion + Snap) */}
               {measurePoints.length > 0 && (
                 <g>
                   {measurePoints.length > 1 && (
-                    <polyline
-                      points={measurePoints.map((p) => `${p.x},${p.y}`).join(' ')}
-                      fill="none"
-                      stroke="#fbbf24"
-                      strokeWidth={2.6 / zoom}
-                      strokeDasharray={`${5 / zoom},${3 / zoom}`}
-                    />
+                    <>
+                      {/* Outer dark stroke for contrast on satellite map */}
+                      <polyline
+                        points={measurePoints.map((p) => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke="#020617"
+                        strokeOpacity={0.85}
+                        strokeWidth={4.5 / zoom}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {/* Dashed yellow measurement line */}
+                      <polyline
+                        points={measurePoints.map((p) => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke="#fbbf24"
+                        strokeWidth={2.6 / zoom}
+                        strokeDasharray={`${5 / zoom},${3.5 / zoom}`}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </>
                   )}
+
+                  {/* Segment distance labels & midpoint drag-to-insert handles */}
                   {measurePoints.map((pt, idx) => {
-                    const segDist =
-                      idx > 0
-                        ? haversineMeters(
-                            measurePoints[idx - 1].lat,
-                            measurePoints[idx - 1].lon,
-                            pt.lat,
-                            pt.lon
-                          )
-                        : 0;
+                    if (idx === 0) return null;
+                    const prev = measurePoints[idx - 1];
+                    const segDist = haversineMeters(prev.lat, prev.lon, pt.lat, pt.lon);
+                    const midX = (prev.x + pt.x) / 2;
+                    const midY = (prev.y + pt.y) / 2;
+                    const labelText = `${segDist.toFixed(1)} m`;
+
                     return (
-                      <g key={`mp-${idx}`} transform={`translate(${pt.x}, ${pt.y})`}>
+                      <g key={`mseg-${idx}`} transform={`translate(${midX}, ${midY})`}>
+                        {/* Draggable midpoint handle to insert a new bend point */}
                         <circle
-                          r={4 / zoom}
-                          fill="#fbbf24"
+                          r={3.2 / zoom}
+                          fill="#fde68a"
                           stroke="#020617"
-                          strokeWidth={1.2 / zoom}
+                          strokeWidth={1 / zoom}
+                          className="cursor-grab active:cursor-grabbing opacity-80 hover:opacity-100"
+                          onMouseDown={(e) => {
+                            if (e.button !== 0) return;
+                            e.stopPropagation();
+                            const midGps = unprojectPoint(midX, midY);
+                            const insertedPt = { ...midGps, x: midX, y: midY, snapLabel: null };
+                            setMeasurePoints((old) => [
+                              ...old.slice(0, idx),
+                              insertedPt,
+                              ...old.slice(idx)
+                            ]);
+                            setDraggingMeasureIdx(idx);
+                          }}
+                        >
+                          <title>Tarik titik tengah ini untuk menambah belokan garis ukur</title>
+                        </circle>
+
+                        {/* Segment distance label positioned slightly above midpoint */}
+                        <text
+                          y={-6.5 / zoom}
+                          textAnchor="middle"
+                          fill="#fef08a"
+                          stroke="#020617"
+                          strokeWidth={3 / zoom}
+                          paintOrder="stroke"
+                          fontSize={8.5 / zoom}
+                          fontWeight="bold"
+                          className="pointer-events-none"
+                        >
+                          {labelText}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Draggable vertex handles for each measurement point */}
+                  {measurePoints.map((pt, idx) => {
+                    const isHovered = hoveredMeasureIdx === idx || draggingMeasureIdx === idx;
+                    return (
+                      <g
+                        key={`mp-${idx}`}
+                        transform={`translate(${pt.x}, ${pt.y})`}
+                        className="cursor-grab active:cursor-grabbing"
+                        onMouseEnter={() => setHoveredMeasureIdx(idx)}
+                        onMouseLeave={() => setHoveredMeasureIdx(null)}
+                        onMouseDown={(e) => {
+                          if (e.button !== 0) return;
+                          e.stopPropagation();
+                          setDraggingMeasureIdx(idx);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setMeasurePoints((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setMeasurePoints((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                      >
+                        <title>
+                          {`Titik Ukur #${idx + 1}${pt.snapLabel ? ` (${pt.snapLabel})` : ''} — Geser (drag) untuk memindahkan, Klik kanan / 2x untuk hapus`}
+                        </title>
+                        {/* Invisible larger hit area so grabbing the point is effortless */}
+                        <circle r={11 / zoom} fill="transparent" />
+
+                        {/* Outer halo ring when hovered or dragged */}
+                        <circle
+                          r={(isHovered ? 8.2 : 6.4) / zoom}
+                          fill={isHovered ? 'rgba(251, 191, 36, 0.35)' : 'rgba(251, 191, 36, 0.18)'}
+                          stroke={isHovered ? '#ffffff' : '#fbbf24'}
+                          strokeWidth={1 / zoom}
                         />
-                        {idx > 0 && (
-                          <text
-                            y={-7 / zoom}
-                            textAnchor="middle"
-                            fill="#fde68a"
-                            stroke="#020617"
-                            strokeWidth={2.5 / zoom}
-                            paintOrder="stroke"
-                            fontSize={8 / zoom}
-                            fontWeight="bold"
-                          >
-                            +{segDist.toFixed(1)}m
-                          </text>
-                        )}
+
+                        {/* Main draggable yellow handle */}
+                        <circle
+                          r={4.5 / zoom}
+                          fill={isHovered ? '#fde047' : '#fbbf24'}
+                          stroke="#020617"
+                          strokeWidth={1.4 / zoom}
+                        />
+
+                        {/* Center crosshair dot */}
+                        <circle r={1.3 / zoom} fill="#020617" />
+
+                        {/* Snap badge or point index */}
+                        <text
+                          y={11 / zoom}
+                          textAnchor="middle"
+                          fill="#fde68a"
+                          stroke="#020617"
+                          strokeWidth={2.4 / zoom}
+                          paintOrder="stroke"
+                          fontSize={7 / zoom}
+                          fontWeight="bold"
+                          className="pointer-events-none"
+                        >
+                          {pt.snapLabel ? `📍 ${pt.snapLabel}` : `#${idx + 1}`}
+                        </text>
                       </g>
                     );
                   })}
@@ -1336,6 +1507,18 @@ export default function TopologyMap({ project }) {
             </g>
           </svg>
         </div>
+
+        {/* Floating Helper Banner when Measure Mode is Active */}
+        {(measureMode || measurePoints.length > 0) && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-slate-950/90 backdrop-blur-md border border-amber-400/50 rounded-xl px-3.5 py-1.5 text-[11px] text-amber-200 shadow-xl flex items-center gap-2.5 pointer-events-none">
+            <Ruler className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>
+              <strong>Total Jarak: {totalMeasuredMeters.toFixed(1)} m</strong> ({measurePoints.length}{' '}
+              titik) • <em>Tarik/geser titik kuning</em> untuk memindahkan • <em>Klik 2x/kanan</em>{' '}
+              untuk hapus titik
+            </span>
+          </div>
+        )}
 
         {/* Top-Left Google Earth Compass & Orientation Widget */}
         <div className="absolute top-3 left-3 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-3 py-2 text-[11px] text-slate-200 shadow-xl">
