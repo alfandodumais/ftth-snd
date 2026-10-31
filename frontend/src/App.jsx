@@ -80,7 +80,7 @@ export default function App() {
   const [clusterSearch, setClusterSearch] = useState('');
   const [adminUserFilter, setAdminUserFilter] = useState('ALL');
   const [clusterPage, setClusterPage] = useState(1);
-  const [clusterPageSize, setClusterPageSize] = useState(5);
+  const [clusterPageSize, setClusterPageSize] = useState(10);
 
   // Convert KMZ studio state
   const [uploading, setUploading] = useState(false);

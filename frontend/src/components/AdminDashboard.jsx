@@ -458,6 +458,38 @@ export default function AdminDashboard({
     [allFilteredClusters]
   );
 
+  // Pagination state for Monitoring Cluster table (default 10 items per page)
+  const [clusterPage, setClusterPage] = useState(1);
+  const [clusterPageSize, setClusterPageSize] = useState(10);
+
+  const totalClusterPages = Math.max(1, Math.ceil(allFilteredClusters.length / clusterPageSize));
+  const safeClusterPage = Math.min(clusterPage, totalClusterPages);
+
+  useEffect(() => {
+    setClusterPage(1);
+  }, [clusterSearch, clusterPageSize]);
+
+  const paginatedClusters = useMemo(() => {
+    const startIdx = (safeClusterPage - 1) * clusterPageSize;
+    return allFilteredClusters.slice(startIdx, startIdx + clusterPageSize);
+  }, [allFilteredClusters, safeClusterPage, clusterPageSize]);
+
+  // Pagination state for Manajemen User table (default 10 items per page)
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState(10);
+
+  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / userPageSize));
+  const safeUserPage = Math.min(userPage, totalUserPages);
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [searchTerm, filterStatus, userPageSize]);
+
+  const paginatedUsers = useMemo(() => {
+    const startIdx = (safeUserPage - 1) * userPageSize;
+    return filteredUsers.slice(startIdx, startIdx + userPageSize);
+  }, [filteredUsers, safeUserPage, userPageSize]);
+
   const pendingCount = users.filter((u) => u.status === 'PENDING').length;
 
   return (
@@ -672,177 +704,267 @@ export default function AdminDashboard({
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-950/90 text-slate-400 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="py-3.5 px-4 w-12 text-center">No</th>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Drafter / User</th>
-                    <th className="py-3.5 px-4 min-w-[200px]">Kode &amp; Nama Cluster</th>
-                    <th className="py-3.5 px-4 min-w-[210px]">File KMZ &amp; Wilayah</th>
-                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Homepass</th>
-                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Topologi FDT / FAT</th>
-                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Kabel FO &amp; Tiang</th>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Waktu Convert</th>
-                    <th className="py-3.5 px-5 text-right whitespace-nowrap">Aksi Admin</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/70">
-                  {allFilteredClusters.map((c, idx) => {
-                    const u = c.owner || {};
-                    const isOwnerAdmin = u.role === 'ADMIN';
-                    const avatarChar = (u.username || u.fullName || 'U').charAt(0).toUpperCase();
-                    const createdDate = new Date(c.createdAt);
-                    const dateStr = createdDate.toLocaleDateString('id-ID', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric'
-                    });
-                    const timeStr = createdDate.toLocaleTimeString('id-ID', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit'
-                    });
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-950/90 text-slate-400 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider">
+                      <th className="py-3.5 px-3 w-11 text-center">No</th>
+                      <th className="py-3.5 px-3 whitespace-nowrap">Drafter / User</th>
+                      <th className="py-3.5 px-3 min-w-[175px]">Kode &amp; Nama Cluster</th>
+                      <th className="py-3.5 px-3 min-w-[185px]">File KMZ &amp; Wilayah</th>
+                      <th className="py-3.5 px-3 text-center whitespace-nowrap">Homepass</th>
+                      <th className="py-3.5 px-3 text-center whitespace-nowrap">Topologi FDT / FAT</th>
+                      <th className="py-3.5 px-3 text-center whitespace-nowrap">Kabel FO &amp; Tiang</th>
+                      <th className="py-3.5 px-3 whitespace-nowrap">Waktu Convert</th>
+                      <th className="py-3.5 px-4 text-right whitespace-nowrap">Aksi Admin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/70">
+                    {paginatedClusters.map((c, idx) => {
+                      const rowNum = (safeClusterPage - 1) * clusterPageSize + idx + 1;
+                      const u = c.owner || {};
+                      const isOwnerAdmin = u.role === 'ADMIN';
+                      const avatarChar = (u.username || u.fullName || 'U').charAt(0).toUpperCase();
+                      const createdDate = new Date(c.createdAt);
+                      const dateStr = createdDate.toLocaleDateString('id-ID', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                      });
+                      const timeStr = createdDate.toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      });
 
-                    return (
-                      <tr key={c.id} className="hover:bg-slate-800/40 transition group">
-                        {/* No */}
-                        <td className="py-3.5 px-4 text-center align-middle">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-bold text-slate-400">
-                            {idx + 1}
-                          </span>
-                        </td>
+                      return (
+                        <tr key={c.id} className="hover:bg-slate-800/40 transition group">
+                          {/* No */}
+                          <td className="py-3.5 px-3 text-center align-middle">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono font-bold text-slate-400">
+                              {rowNum}
+                            </span>
+                          </td>
 
-                        {/* Drafter / User (Circular Avatar + Username Only) */}
-                        <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => setClusterSearch(u.username || '')}
-                            title={`Klik untuk filter user: ${u.fullName || u.username} (@${u.username})`}
-                            className="inline-flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-slate-800/90 hover:border-cyan-500/40 transition shadow-sm group/user"
-                          >
-                            <div
-                              className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white shrink-0 shadow-md ${
-                                isOwnerAdmin
-                                  ? 'bg-gradient-to-br from-purple-500 via-indigo-600 to-blue-600 ring-2 ring-purple-500/30'
-                                  : 'bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 ring-2 ring-cyan-500/30'
-                              }`}
+                          {/* Drafter / User (Circular Avatar + Username Only) */}
+                          <td className="py-3.5 px-3 align-middle whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setClusterSearch(u.username || '')}
+                              title={`Klik untuk filter user: ${u.fullName || u.username} (@${u.username})`}
+                              className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-slate-800/90 hover:border-cyan-500/40 transition shadow-sm group/user"
                             >
-                              {avatarChar}
+                              <div
+                                className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white shrink-0 shadow-md ${
+                                  isOwnerAdmin
+                                    ? 'bg-gradient-to-br from-purple-500 via-indigo-600 to-blue-600 ring-2 ring-purple-500/30'
+                                    : 'bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 ring-2 ring-cyan-500/30'
+                                }`}
+                              >
+                                {avatarChar}
+                              </div>
+                              <span className="font-mono font-bold text-xs text-slate-200 group-hover/user:text-cyan-300 transition">
+                                {u.username || 'user'}
+                              </span>
+                            </button>
+                          </td>
+
+                          {/* Kode & Nama Cluster */}
+                          <td className="py-3.5 px-3 align-middle">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 whitespace-nowrap">
+                              {c.clusterCode}
+                            </span>
+                            <div className="font-extrabold text-white mt-1 leading-snug">
+                              {c.clusterName}
                             </div>
-                            <span className="font-mono font-bold text-xs text-slate-200 group-hover/user:text-cyan-300 transition">
-                              {u.username || 'user'}
+                          </td>
+
+                          {/* File KMZ & Wilayah */}
+                          <td className="py-3.5 px-3 align-middle">
+                            <div
+                              className="font-mono text-[11px] text-slate-200 truncate max-w-[200px]"
+                              title={c.kmzFileName}
+                            >
+                              {c.kmzFileName}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-1 truncate max-w-[200px]">
+                              {c.regencyCity} ({c.province})
+                            </div>
+                          </td>
+
+                          {/* Homepass */}
+                          <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
+                            <span className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 font-extrabold text-xs whitespace-nowrap">
+                              <Home className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span>{(c.totalHomepass || 0).toLocaleString()} HP</span>
                             </span>
-                          </button>
-                        </td>
+                          </td>
 
-                        {/* Kode & Nama Cluster */}
-                        <td className="py-3.5 px-4 align-middle">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 whitespace-nowrap">
-                            {c.clusterCode}
-                          </span>
-                          <div className="font-extrabold text-white mt-1.5 leading-snug">
-                            {c.clusterName}
-                          </div>
-                        </td>
+                          {/* Topologi FDT / FAT */}
+                          <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                              <span className="px-2 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[11px] whitespace-nowrap">
+                                {c.totalFdt} FDT
+                              </span>
+                              <span className="px-2 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-bold text-[11px] whitespace-nowrap">
+                                {c.totalFat} FAT
+                              </span>
+                            </div>
+                          </td>
 
-                        {/* File KMZ & Wilayah */}
-                        <td className="py-3.5 px-4 align-middle">
-                          <div
-                            className="font-mono text-[11px] text-slate-200 truncate max-w-[230px]"
-                            title={c.kmzFileName}
-                          >
-                            {c.kmzFileName}
-                          </div>
-                          <div className="text-[11px] text-slate-400 mt-1 truncate max-w-[230px]">
-                            {c.regencyCity} ({c.province})
-                          </div>
-                        </td>
+                          {/* Kabel FO & Tiang */}
+                          <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
+                            <div className="font-extrabold text-amber-400 whitespace-nowrap">
+                              {(c.totalCableLengthM || 0).toLocaleString()} m FO
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
+                              {c.totalPoles} Tiang
+                            </div>
+                          </td>
 
-                        {/* Homepass */}
-                        <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 font-extrabold text-xs whitespace-nowrap">
-                            <Home className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span>{(c.totalHomepass || 0).toLocaleString()} HP</span>
-                          </span>
-                        </td>
+                          {/* Waktu Convert */}
+                          <td className="py-3.5 px-3 align-middle whitespace-nowrap">
+                            <div className="text-slate-200 font-semibold text-[11px] whitespace-nowrap">
+                              {dateStr}
+                            </div>
+                            <div className="text-slate-500 font-mono text-[10px] mt-0.5 whitespace-nowrap">
+                              {timeStr}
+                            </div>
+                          </td>
 
-                        {/* Topologi FDT / FAT */}
-                        <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                            <span className="px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 font-bold text-[11px] whitespace-nowrap">
-                              {c.totalFdt} FDT
-                            </span>
-                            <span className="px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-bold text-[11px] whitespace-nowrap">
-                              {c.totalFat} FAT
-                            </span>
-                          </div>
-                        </td>
+                          {/* Aksi Admin */}
+                          <td className="py-3.5 px-4 text-right align-middle whitespace-nowrap">
+                            <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                              <button
+                                onClick={() => onInspectProject && onInspectProject(c.id)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-[11px] transition whitespace-nowrap"
+                                title="Buka & Lihat Detail Spreadsheet Cluster Ini"
+                              >
+                                <Eye className="w-3.5 h-3.5 shrink-0" />
+                                <span>Buka Preview</span>
+                              </button>
+                              <button
+                                onClick={() => handleAdminDownload(c, 'hpdb')}
+                                disabled={downloadingKey === `${c.id}-hpdb`}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
+                                title="Download Excel HPDB"
+                              >
+                                <Download className="w-3.5 h-3.5 shrink-0" />
+                                <span>HPDB.xlsx</span>
+                              </button>
+                              <button
+                                onClick={() => handleAdminDownload(c, 'boq')}
+                                disabled={downloadingKey === `${c.id}-boq`}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
+                                title="Download Excel BoQ"
+                              >
+                                <Download className="w-3.5 h-3.5 shrink-0" />
+                                <span>BOQ.xlsx</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCluster(c, u)}
+                                className="p-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/25 border border-red-500/25 text-red-400 transition shrink-0"
+                                title="Hapus Cluster Ini"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                        {/* Kabel FO & Tiang */}
-                        <td className="py-3.5 px-4 text-center align-middle whitespace-nowrap">
-                          <div className="font-extrabold text-amber-400 whitespace-nowrap">
-                            {(c.totalCableLengthM || 0).toLocaleString()} m FO
-                          </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
-                            {c.totalPoles} Tiang
-                          </div>
-                        </td>
+              {/* Interactive Pagination Footer Bar (10 Item Per Halaman) */}
+              <div className="px-6 py-3.5 bg-slate-950/90 border-t border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3 text-slate-400">
+                  <span>
+                    Menampilkan{' '}
+                    <strong className="text-white">
+                      {(safeClusterPage - 1) * clusterPageSize + 1}
+                    </strong>{' '}
+                    –{' '}
+                    <strong className="text-white">
+                      {Math.min(safeClusterPage * clusterPageSize, allFilteredClusters.length)}
+                    </strong>{' '}
+                    dari <strong className="text-cyan-400">{allFilteredClusters.length}</strong> cluster
+                  </span>
 
-                        {/* Waktu Convert */}
-                        <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                          <div className="text-slate-200 font-semibold text-[11px] whitespace-nowrap">
-                            {dateStr}
-                          </div>
-                          <div className="text-slate-500 font-mono text-[10px] mt-0.5 whitespace-nowrap">
-                            {timeStr}
-                          </div>
-                        </td>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500">• Tampilkan:</span>
+                    <select
+                      value={clusterPageSize}
+                      onChange={(e) => setClusterPageSize(Number(e.target.value))}
+                      className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-white font-bold text-xs focus:outline-none focus:border-cyan-500"
+                    >
+                      {[10, 20, 50].map((sz) => (
+                        <option key={sz} value={sz}>
+                          {sz} Item / Halaman
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                        {/* Aksi Admin */}
-                        <td className="py-3.5 px-5 text-right align-middle whitespace-nowrap">
-                          <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
-                            <button
-                              onClick={() => onInspectProject && onInspectProject(c.id)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-[11px] transition whitespace-nowrap"
-                              title="Buka & Lihat Detail Spreadsheet Cluster Ini"
-                            >
-                              <Eye className="w-3.5 h-3.5 shrink-0" />
-                              <span>Buka Preview</span>
-                            </button>
-                            <button
-                              onClick={() => handleAdminDownload(c, 'hpdb')}
-                              disabled={downloadingKey === `${c.id}-hpdb`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
-                              title="Download Excel HPDB"
-                            >
-                              <Download className="w-3.5 h-3.5 shrink-0" />
-                              <span>HPDB.xlsx</span>
-                            </button>
-                            <button
-                              onClick={() => handleAdminDownload(c, 'boq')}
-                              disabled={downloadingKey === `${c.id}-boq`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] transition disabled:opacity-50 whitespace-nowrap"
-                              title="Download Excel BoQ"
-                            >
-                              <Download className="w-3.5 h-3.5 shrink-0" />
-                              <span>BOQ.xlsx</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCluster(c, u)}
-                              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/25 border border-red-500/25 text-red-400 transition shrink-0"
-                              title="Hapus Cluster Ini"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setClusterPage(1)}
+                    disabled={safeClusterPage <= 1}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                    title="Halaman Pertama"
+                  >
+                    «
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClusterPage((p) => Math.max(1, p - 1))}
+                    disabled={safeClusterPage <= 1}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                  >
+                    ‹ Prev
+                  </button>
+
+                  <div className="flex items-center gap-1 px-1">
+                    {Array.from({ length: totalClusterPages }, (_, i) => i + 1).map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setClusterPage(pageNum)}
+                        className={`w-8 h-8 rounded-lg font-extrabold text-xs transition ${
+                          safeClusterPage === pageNum
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25'
+                            : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setClusterPage((p) => Math.min(totalClusterPages, p + 1))}
+                    disabled={safeClusterPage >= totalClusterPages}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                  >
+                    Next ›
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClusterPage(totalClusterPages)}
+                    disabled={safeClusterPage >= totalClusterPages}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                    title="Halaman Terakhir"
+                  >
+                    »
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -915,7 +1037,7 @@ export default function AdminDashboard({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">
-                {filteredUsers.map((u) => (
+                {paginatedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-white">{u.fullName}</div>
@@ -1069,6 +1191,95 @@ export default function AdminDashboard({
               </tbody>
             </table>
           </div>
+
+          {/* Interactive Pagination Footer Bar for Manajemen User (10 Item Per Halaman) */}
+          {filteredUsers.length > 0 && (
+            <div className="px-6 py-3.5 bg-slate-950/90 border-t border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3 text-slate-400">
+                <span>
+                  Menampilkan{' '}
+                  <strong className="text-white">
+                    {(safeUserPage - 1) * userPageSize + 1}
+                  </strong>{' '}
+                  –{' '}
+                  <strong className="text-white">
+                    {Math.min(safeUserPage * userPageSize, filteredUsers.length)}
+                  </strong>{' '}
+                  dari <strong className="text-cyan-400">{filteredUsers.length}</strong> akun
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500">• Tampilkan:</span>
+                  <select
+                    value={userPageSize}
+                    onChange={(e) => setUserPageSize(Number(e.target.value))}
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-white font-bold text-xs focus:outline-none focus:border-cyan-500"
+                  >
+                    {[10, 20, 50].map((sz) => (
+                      <option key={sz} value={sz}>
+                        {sz} Item / Halaman
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setUserPage(1)}
+                  disabled={safeUserPage <= 1}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                  title="Halaman Pertama"
+                >
+                  «
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                  disabled={safeUserPage <= 1}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                >
+                  ‹ Prev
+                </button>
+
+                <div className="flex items-center gap-1 px-1">
+                  {Array.from({ length: totalUserPages }, (_, i) => i + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => setUserPage(pageNum)}
+                      className={`w-8 h-8 rounded-lg font-extrabold text-xs transition ${
+                        safeUserPage === pageNum
+                          ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/25'
+                          : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setUserPage((p) => Math.min(totalUserPages, p + 1))}
+                  disabled={safeUserPage >= totalUserPages}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                >
+                  Next ›
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserPage(totalUserPages)}
+                  disabled={safeUserPage >= totalUserPages}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none font-bold transition"
+                  title="Halaman Terakhir"
+                >
+                  »
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
