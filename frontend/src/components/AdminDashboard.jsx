@@ -28,7 +28,9 @@ import {
   Save,
   KeyRound,
   Lock,
-  Key
+  Key,
+  UserPlus,
+  Sparkles
 } from 'lucide-react';
 import { apiFetch, downloadExcelFile } from '../api';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
@@ -92,6 +94,24 @@ export default function AdminDashboard({
   // Reset Password Modal State
   const [resetPasswordTarget, setResetPasswordTarget] = useState(null);
   const [resettingPassword, setResettingPassword] = useState(false);
+
+  // Create User Modal State (Superadmin Only)
+  const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createUserError, setCreateUserError] = useState('');
+  const [newUserForm, setNewUserForm] = useState({
+    fullName: '',
+    username: '',
+    email: '',
+    password: '',
+    role: 'DRAFTER',
+    planCode: 'PRO',
+    employeeId: '',
+    phone: '',
+    department: 'SND FTTH Survey & Design',
+    region: '',
+    passwordResetRequired: false
+  });
 
   const notify = (msg, type = 'success') => {
     if (onShowToast) {
@@ -305,6 +325,57 @@ export default function AdminDashboard({
     }
   };
 
+  const handleOpenCreateUserModal = () => {
+    setCreateUserError('');
+    setNewUserForm({
+      fullName: '',
+      username: '',
+      email: '',
+      password: '',
+      role: 'DRAFTER',
+      planCode: 'PRO',
+      employeeId: '',
+      phone: '',
+      department: 'SND FTTH Survey & Design',
+      region: '',
+      passwordResetRequired: false
+    });
+    setCreateUserModalOpen(true);
+  };
+
+  const handleCreateUserSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setCreateUserError('');
+
+    if (!newUserForm.fullName.trim() || !newUserForm.username.trim() || !newUserForm.email.trim()) {
+      setCreateUserError('Nama lengkap, username, dan alamat email wajib diisi.');
+      return;
+    }
+
+    if (!newUserForm.passwordResetRequired && String(newUserForm.password || '').length < 6) {
+      setCreateUserError(
+        'Kata sandi awal minimal 6 karakter (atau aktifkan opsi wajib ganti password saat login pertama).'
+      );
+      return;
+    }
+
+    setCreatingUser(true);
+    try {
+      const res = await apiFetch('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(newUserForm)
+      });
+      setCreateUserModalOpen(false);
+      await loadAdminData();
+      setAdminTab('APPROVALS');
+      notify(res.message || `User "${newUserForm.fullName}" berhasil ditambahkan!`);
+    } catch (err) {
+      setCreateUserError(err.message || 'Gagal menambahkan user baru.');
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
   const handleDeleteCluster = (clusterObj, ownerUser) => {
     setDeleteClusterTarget({
       ...clusterObj,
@@ -496,13 +567,25 @@ export default function AdminDashboard({
           </button>
         </div>
 
-        <button
-          onClick={loadAdminData}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
-          <span>Refresh Data</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {currentUser?.role === 'ADMIN' && (
+            <button
+              type="button"
+              onClick={handleOpenCreateUserModal}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/20 transition"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>+ Create User</span>
+            </button>
+          )}
+          <button
+            onClick={loadAdminData}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+            <span>Refresh Data</span>
+          </button>
+        </div>
       </div>
 
       {/* =====================================================================
@@ -1639,6 +1722,354 @@ export default function AdminDashboard({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          MODAL CREATE NEW USER & PILIH PAKET (KHUSUS SUPERADMIN)
+          ===================================================================== */}
+      {createUserModalOpen && currentUser?.role === 'ADMIN' && (
+        <div
+          className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 select-none overflow-y-auto"
+          onClick={() => {
+            if (!creatingUser) setCreateUserModalOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-2xl bg-slate-900 border border-slate-700/90 rounded-3xl shadow-2xl overflow-hidden my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-cyan-500 to-blue-600" />
+
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-extrabold text-white">
+                      Create New User &amp; Aktivasi Paket
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                      SUPERADMIN ONLY
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Tambahkan akun Drafter atau Admin baru secara langsung dengan status{' '}
+                    <strong className="text-emerald-400">APPROVED &amp; ACTIVE</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={creatingUser}
+                onClick={() => setCreateUserModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUserSubmit} className="p-6 space-y-5">
+              {createUserError && (
+                <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{createUserError}</span>
+                </div>
+              )}
+
+              {/* Section 1: Data Akun & Kredensial */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Nama Lengkap Pengguna <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newUserForm.fullName}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({ ...prev, fullName: e.target.value }))
+                    }
+                    placeholder="Contoh: Budi Santoso (Drafter SND)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Username Login <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newUserForm.username}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({
+                        ...prev,
+                        username: e.target.value.toLowerCase().replace(/\s+/g, '')
+                      }))
+                    }
+                    placeholder="Contoh: budisantoso"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Alamat Email <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={newUserForm.email}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    placeholder="Contoh: budi@ftth-snd.id"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Kata Sandi Awal {!newUserForm.passwordResetRequired && <span className="text-rose-400">*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    required={!newUserForm.passwordResetRequired}
+                    disabled={newUserForm.passwordResetRequired}
+                    value={newUserForm.password}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({ ...prev, password: e.target.value }))
+                    }
+                    placeholder={
+                      newUserForm.passwordResetRequired
+                        ? 'User akan membuat sandi sendiri saat login pertama'
+                        : 'Minimal 6 karakter...'
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Role Sistem
+                  </label>
+                  <select
+                    value={newUserForm.role}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({
+                        ...prev,
+                        role: e.target.value,
+                        planCode: e.target.value === 'ADMIN' ? 'ULTRA' : prev.planCode
+                      }))
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="DRAFTER">DRAFTER (Pengguna / Engineer SND)</option>
+                    <option value="ADMIN">SUPERADMIN / ADMIN MASTER</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Opsi Wajib Ganti Password saat Login Pertama */}
+              <label className="flex items-center gap-3 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newUserForm.passwordResetRequired}
+                  onChange={(e) =>
+                    setNewUserForm((prev) => ({
+                      ...prev,
+                      passwordResetRequired: e.target.checked
+                    }))
+                  }
+                  className="w-4 h-4 rounded accent-indigo-500"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-indigo-200">
+                    Minta user membuat password baru sendiri saat login pertama kali
+                  </span>
+                  <span className="block text-[11px] text-slate-400">
+                    Saat user memasukkan username/email di halaman login, otomatis muncul form pembuatan kata sandi baru.
+                  </span>
+                </div>
+              </label>
+
+              {/* Section 2: Pilihan Paket Langganan & Kuota */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-cyan-400">
+                  Pilih Paket Langganan &amp; Hak Akses Fitur
+                </label>
+
+                {newUserForm.role === 'ADMIN' ? (
+                  <div className="p-3.5 rounded-2xl bg-purple-500/15 border border-purple-500/40 text-xs text-purple-200 flex items-center justify-between">
+                    <div>
+                      <div className="font-extrabold text-white">
+                        Role ADMIN MASTER — Akses Penuh Tanpa Batas (Unlimited)
+                      </div>
+                      <div className="text-[11px] text-purple-300 mt-0.5">
+                        Termasuk Unlimited Convert KMZ, HPDB, BoQ, CAD DWG/DXF &amp; Panel Administrator
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-purple-500 text-white font-extrabold text-[10px]">
+                      UNLIMITED ∞
+                    </span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      {
+                        code: 'BASIC',
+                        title: 'Paket BASIC',
+                        quota: `${paymentSettings.basicLimit || 10}x Convert / Bln`,
+                        desc: 'HPDB & Peta GIS (Tanpa BoQ)',
+                        activeBorder: 'border-amber-400 bg-amber-500/15 text-amber-200',
+                        badgeClass: 'bg-amber-500/20 text-amber-300'
+                      },
+                      {
+                        code: 'PRO',
+                        title: 'Paket PRO',
+                        quota: `${paymentSettings.proLimit || 30}x Convert / Bln`,
+                        desc: 'Lengkap HPDB + BoQ.xlsx + GIS',
+                        activeBorder: 'border-cyan-400 bg-cyan-500/15 text-cyan-200',
+                        badgeClass: 'bg-cyan-500/20 text-cyan-300'
+                      },
+                      {
+                        code: 'ULTRA',
+                        title: 'Paket ULTRA',
+                        quota: '∞ UNLIMITED Convert',
+                        desc: 'Full Akses Tanpa Batas + BoQ',
+                        activeBorder: 'border-purple-400 bg-purple-500/15 text-purple-200',
+                        badgeClass: 'bg-purple-500/20 text-purple-300'
+                      }
+                    ].map((pkg) => {
+                      const isSel = newUserForm.planCode === pkg.code;
+                      return (
+                        <button
+                          key={pkg.code}
+                          type="button"
+                          onClick={() =>
+                            setNewUserForm((prev) => ({ ...prev, planCode: pkg.code }))
+                          }
+                          className={`text-left p-3.5 rounded-2xl border transition flex flex-col justify-between ${
+                            isSel
+                              ? `${pkg.activeBorder} shadow-lg`
+                              : 'bg-slate-950/90 border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-extrabold text-white">{pkg.title}</span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${pkg.badgeClass}`}
+                              >
+                                {pkg.code}
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-bold text-emerald-400 mt-1.5">
+                              {pkg.quota}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-1">{pkg.desc}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3: Informasi Departemen & Wilayah (Opsional) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-800/80">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    NIK / ID Pegawai (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserForm.employeeId}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({ ...prev, employeeId: e.target.value }))
+                    }
+                    placeholder="Contoh: EMP-SND-105"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    No. WhatsApp / Telepon (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserForm.phone}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    placeholder="Contoh: 0812-3456-7890"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Departemen / Divisi
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserForm.department}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({ ...prev, department: e.target.value }))
+                    }
+                    placeholder="SND FTTH Survey & Design"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Regional / Kota Area Kerja
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserForm.region}
+                    onChange={(e) =>
+                      setNewUserForm((prev) => ({ ...prev, region: e.target.value }))
+                    }
+                    placeholder="Contoh: SULAWESI TENGAH - PALU"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  disabled={creatingUser}
+                  onClick={() => setCreateUserModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingUser}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/25 transition disabled:opacity-50"
+                >
+                  {creatingUser ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyimpan Akun...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Simpan &amp; Aktifkan User</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

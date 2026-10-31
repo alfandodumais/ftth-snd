@@ -1018,6 +1018,123 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// Create a new user directly by Superadmin / Admin with active subscription package
+app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const {
+      fullName,
+      username,
+      email,
+      password,
+      role = 'DRAFTER',
+      planCode = 'PRO',
+      employeeId,
+      phone,
+      department,
+      region,
+      passwordResetRequired = false,
+    } = req.body;
+
+    if (!fullName || !username || !email) {
+      return res.status(400).json({
+        message: 'Nama lengkap, username, dan alamat email wajib diisi.',
+      });
+    }
+
+    const rawPassword = password ? String(password) : 'SndFtth2026!';
+    if (!passwordResetRequired && rawPassword.length < 6) {
+      return res.status(400).json({
+        message: 'Kata sandi minimal harus terdiri dari 6 karakter.',
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanUsername = String(username).trim().toLowerCase().replace(/\s+/g, '');
+
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: cleanEmail }, { username: cleanUsername }],
+      },
+    });
+
+    if (existing) {
+      return res.status(409).json({
+        message:
+          existing.email === cleanEmail
+            ? 'Alamat email tersebut sudah digunakan oleh akun lain.'
+            : 'Username tersebut sudah digunakan oleh akun lain.',
+      });
+    }
+
+    const settings = await getOrCreatePaymentSettings();
+    const catalog = getPlanCatalog(settings);
+    const normalizedRole = String(role).toUpperCase() === 'ADMIN' ? 'ADMIN' : 'DRAFTER';
+    const normalizedPlanCode =
+      normalizedRole === 'ADMIN'
+        ? 'ULTRA'
+        : ['BASIC', 'PRO', 'ULTRA'].includes(String(planCode).toUpperCase())
+        ? String(planCode).toUpperCase()
+        : 'PRO';
+    const plan = catalog[normalizedPlanCode] || catalog.PRO;
+
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const createdUser = await prisma.user.create({
+      data: {
+        fullName: String(fullName).trim(),
+        username: cleanUsername,
+        email: cleanEmail,
+        passwordHash,
+        employeeId: employeeId ? String(employeeId).trim() : null,
+        phone: phone ? String(phone).trim() : null,
+        department: department ? String(department).trim() : 'SND FTTH Survey & Design',
+        region: region ? String(region).trim() : 'NATIONAL',
+        role: normalizedRole,
+        status: 'APPROVED',
+        approvedById: req.user.id,
+        approvedAt: now,
+        subscriptionPlan: plan.code,
+        subscriptionStatus: 'ACTIVE',
+        subscriptionExpiresAt: expiresAt,
+        monthlyConvertLimit: normalizedRole === 'ADMIN' ? -1 : plan.monthlyLimit,
+        monthlyConvertUsed: 0,
+        boqAccessAllowed: normalizedRole === 'ADMIN' ? true : plan.boqAllowed,
+        billingCycleStart: now,
+        passwordResetRequired: Boolean(passwordResetRequired),
+        passwordResetAt: passwordResetRequired ? now : null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'ADMIN_CREATED_USER',
+        entityType: 'USER',
+        entityId: createdUser.id,
+        details: JSON.stringify({
+          createdUsername: createdUser.username,
+          createdEmail: createdUser.email,
+          role: createdUser.role,
+          subscriptionPlan: createdUser.subscriptionPlan,
+        }),
+        ipAddress: req.ip,
+      },
+    });
+
+    return res.status(201).json({
+      message: `Akun "${createdUser.fullName}" (@${createdUser.username}) dengan ${
+        normalizedRole === 'ADMIN' ? 'Role ADMIN MASTER' : plan.name
+      } berhasil dibuat dan langsung aktif!`,
+      user: sanitizeUser(createdUser),
+    });
+  } catch (err) {
+    console.error('Admin create user error:', err);
+    return res.status(500).json({ message: 'Gagal membuat akun pengguna baru.' });
+  }
+});
+
 app.patch('/api/admin/users/:id/approve', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
