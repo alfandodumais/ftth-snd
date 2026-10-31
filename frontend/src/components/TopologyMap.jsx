@@ -123,6 +123,7 @@ export default function TopologyMap({ project }) {
   const [rotation, setRotation] = useState(0);
   const [satBrightness, setSatBrightness] = useState(0.88);
   const [showAllLabels, setShowAllLabels] = useState(false);
+  const [textSizePreset, setTextSizePreset] = useState(1.25);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tileFallback, setTileFallback] = useState(false);
 
@@ -636,7 +637,43 @@ export default function TopologyMap({ project }) {
   ].filter(Boolean);
 
   const isSatelliteActive = mapMode === 'hybrid' || mapMode === 'satellite';
-  const showDetailNumbers = showAllLabels || zoom >= 3.2;
+  const showDetailNumbers = showAllLabels || zoom >= 2.6;
+
+  // Smart Dynamic Auto-Zoom Typography & Icon Scaling:
+  // When zooming IN, text and icons automatically grow larger & clearer on screen.
+  // When zooming OUT, text and icons scale down gracefully so they don't overlap.
+  const zoomTextFactor = Math.min(2.65, Math.max(0.68, Math.pow(zoom, 0.36))) * textSizePreset;
+  const zoomIconFactor = Math.min(1.85, Math.max(0.82, Math.pow(zoom, 0.22)));
+  const tPx = zoomTextFactor / zoom; // 1 auto-scaled text pixel in SVG coordinate space
+  const iPx = zoomIconFactor / zoom; // 1 auto-scaled icon pixel in SVG coordinate space
+
+  // Detect poles that share location/ID with a FAT or FDT so their Pole ID label is placed below the FAT/FDT icon (zero overlap)
+  const isPoleSharedWithFatOrFdt = (pole) => {
+    const pid = String(pole.poleId || '').trim().toUpperCase();
+    if (pid && geoData.fats.some((f) => String(f.poleId || '').trim().toUpperCase() === pid)) {
+      return true;
+    }
+    const tol = 0.000045;
+    if (
+      geoData.fats.some(
+        (f) =>
+          Math.abs(f.latitude - pole.latitude) < tol &&
+          Math.abs(f.longitude - pole.longitude) < tol
+      )
+    ) {
+      return true;
+    }
+    if (
+      geoData.fdts.some(
+        (f) =>
+          Math.abs(f.latitude - pole.latitude) < tol &&
+          Math.abs(f.longitude - pole.longitude) < tol
+      )
+    ) {
+      return true;
+    }
+    return false;
+  };
 
   return (
     <div
@@ -813,6 +850,20 @@ export default function TopologyMap({ project }) {
           >
             <Tag className="w-3 h-3" />
             <span>No. Rumah &amp; Tiang</span>
+          </button>
+
+          {/* Auto-Zoom Text Size Multiplier Control */}
+          <button
+            type="button"
+            onClick={() =>
+              setTextSizePreset((s) =>
+                s < 1.2 ? 1.25 : s < 1.45 ? 1.5 : s < 1.75 ? 1.85 : s < 2.1 ? 2.25 : 1.0
+              )
+            }
+            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25 transition flex items-center gap-1"
+            title="Ukuran teks otomatis mengikuti Zoom-In / Zoom-Out. Klik untuk memperbesar skala dasar teks (100% - 225%)"
+          >
+            <span>🔤 Teks Auto ({Math.round(textSizePreset * 100)}%)</span>
           </button>
 
           {/* Google Earth Ruler / Measure Distance Tool */}
@@ -1160,6 +1211,7 @@ export default function TopologyMap({ project }) {
                 geoData.poles.map((pole) => {
                   const [x, y] = projectPoint(pole.latitude, pole.longitude);
                   const isExisting = String(pole.poleCategory || '').includes('EXISTING');
+                  const sharedWithFatOrFdt = isPoleSharedWithFatOrFdt(pole);
                   return (
                     <g
                       key={pole.id}
@@ -1179,21 +1231,21 @@ export default function TopologyMap({ project }) {
                       }}
                     >
                       <circle
-                        r={2.8 / zoom}
-                        fill={isExisting ? '#c084fc' : '#e2e8f0'}
+                        r={3.2 * iPx}
+                        fill={isExisting ? '#c084fc' : '#f8fafc'}
                         stroke="#020617"
-                        strokeWidth={0.9 / zoom}
+                        strokeWidth={1.1 * iPx}
                       />
                       {showDetailNumbers && pole.poleId && (
                         <text
-                          y={-4.2 / zoom}
+                          y={sharedWithFatOrFdt ? 14.5 * tPx : -5.5 * tPx}
                           textAnchor="middle"
-                          fill="#e2e8f0"
+                          fill="#f8fafc"
                           stroke="#020617"
-                          strokeWidth={1.6 / zoom}
+                          strokeWidth={2.6 * tPx}
                           paintOrder="stroke"
-                          fontSize={5.5 / zoom}
-                          fontWeight="600"
+                          fontSize={7.2 * tPx}
+                          fontWeight="700"
                         >
                           {pole.poleId}
                         </text>
@@ -1226,22 +1278,22 @@ export default function TopologyMap({ project }) {
                       }}
                     >
                       <circle
-                        r={2.4 / zoom}
+                        r={2.8 * iPx}
                         fill={color}
                         stroke="#020617"
-                        strokeWidth={0.75 / zoom}
-                        fillOpacity={0.92}
+                        strokeWidth={0.9 * iPx}
+                        fillOpacity={0.95}
                       />
                       {showDetailNumbers && hp.homeNumber && (
                         <text
-                          y={-3.8 / zoom}
+                          y={-4.8 * tPx}
                           textAnchor="middle"
-                          fill="#ffffff"
+                          fill="#fef08a"
                           stroke="#020617"
-                          strokeWidth={1.8 / zoom}
+                          strokeWidth={2.8 * tPx}
                           paintOrder="stroke"
-                          fontSize={6 / zoom}
-                          fontWeight="bold"
+                          fontSize={8.2 * tPx}
+                          fontWeight="800"
                         >
                           {hp.homeNumber}
                         </text>
@@ -1273,20 +1325,20 @@ export default function TopologyMap({ project }) {
                       }}
                     >
                       <polygon
-                        points={`0,${-6.5 / zoom} ${6 / zoom},${4.8 / zoom} ${-6 / zoom},${4.8 / zoom}`}
+                        points={`0,${-7.2 * iPx} ${6.6 * iPx},${5.2 * iPx} ${-6.6 * iPx},${5.2 * iPx}`}
                         fill="#ffff00"
                         stroke="#020617"
-                        strokeWidth={1.3 / zoom}
+                        strokeWidth={1.4 * iPx}
                       />
                       <text
-                        y={-8.5 / zoom}
+                        y={-9.5 * iPx}
                         textAnchor="middle"
                         fill="#ffff00"
                         stroke="#020617"
-                        strokeWidth={2.5 / zoom}
+                        strokeWidth={3.2 * tPx}
                         paintOrder="stroke"
-                        fontSize={8.5 / zoom}
-                        fontWeight="bold"
+                        fontSize={9.2 * tPx}
+                        fontWeight="800"
                       >
                         {fat.fatCode}
                       </text>
@@ -1330,24 +1382,24 @@ export default function TopologyMap({ project }) {
                       }}
                     >
                       <rect
-                        x={-8.5 / zoom}
-                        y={-8.5 / zoom}
-                        width={17 / zoom}
-                        height={17 / zoom}
-                        rx={3 / zoom}
+                        x={-9 * iPx}
+                        y={-9 * iPx}
+                        width={18 * iPx}
+                        height={18 * iPx}
+                        rx={3.2 * iPx}
                         fill="#ef4444"
                         stroke="#ffffff"
-                        strokeWidth={1.8 / zoom}
+                        strokeWidth={1.8 * iPx}
                       />
                       <text
-                        y={-11.5 / zoom}
+                        y={-12 * iPx}
                         textAnchor="middle"
                         fill="#ffffff"
                         stroke="#020617"
-                        strokeWidth={3 / zoom}
+                        strokeWidth={3.4 * tPx}
                         paintOrder="stroke"
-                        fontSize={10.5 / zoom}
-                        fontWeight="bold"
+                        fontSize={10.8 * tPx}
+                        fontWeight="800"
                       >
                         {fdt.sheetName} ({fdt.fdtId})
                       </text>
@@ -1366,7 +1418,7 @@ export default function TopologyMap({ project }) {
                         fill="none"
                         stroke="#020617"
                         strokeOpacity={0.85}
-                        strokeWidth={4.5 / zoom}
+                        strokeWidth={4.8 / zoom}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
@@ -1375,8 +1427,8 @@ export default function TopologyMap({ project }) {
                         points={measurePoints.map((p) => `${p.x},${p.y}`).join(' ')}
                         fill="none"
                         stroke="#fbbf24"
-                        strokeWidth={2.6 / zoom}
-                        strokeDasharray={`${5 / zoom},${3.5 / zoom}`}
+                        strokeWidth={2.8 / zoom}
+                        strokeDasharray={`${5.5 / zoom},${3.5 / zoom}`}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
@@ -1396,10 +1448,10 @@ export default function TopologyMap({ project }) {
                       <g key={`mseg-${idx}`} transform={`translate(${midX}, ${midY})`}>
                         {/* Draggable midpoint handle to insert a new bend point */}
                         <circle
-                          r={3.2 / zoom}
+                          r={3.5 * iPx}
                           fill="#fde68a"
                           stroke="#020617"
-                          strokeWidth={1 / zoom}
+                          strokeWidth={1.1 * iPx}
                           className="cursor-grab active:cursor-grabbing opacity-80 hover:opacity-100"
                           onMouseDown={(e) => {
                             if (e.button !== 0) return;
@@ -1419,14 +1471,14 @@ export default function TopologyMap({ project }) {
 
                         {/* Segment distance label positioned slightly above midpoint */}
                         <text
-                          y={-6.5 / zoom}
+                          y={-7.5 * tPx}
                           textAnchor="middle"
                           fill="#fef08a"
                           stroke="#020617"
-                          strokeWidth={3 / zoom}
+                          strokeWidth={3.2 * tPx}
                           paintOrder="stroke"
-                          fontSize={8.5 / zoom}
-                          fontWeight="bold"
+                          fontSize={9.2 * tPx}
+                          fontWeight="800"
                           className="pointer-events-none"
                         >
                           {labelText}
@@ -1464,37 +1516,37 @@ export default function TopologyMap({ project }) {
                           {`Titik Ukur #${idx + 1}${pt.snapLabel ? ` (${pt.snapLabel})` : ''} — Geser (drag) untuk memindahkan, Klik kanan / 2x untuk hapus`}
                         </title>
                         {/* Invisible larger hit area so grabbing the point is effortless */}
-                        <circle r={11 / zoom} fill="transparent" />
+                        <circle r={12 * iPx} fill="transparent" />
 
                         {/* Outer halo ring when hovered or dragged */}
                         <circle
-                          r={(isHovered ? 8.2 : 6.4) / zoom}
+                          r={(isHovered ? 8.8 : 6.8) * iPx}
                           fill={isHovered ? 'rgba(251, 191, 36, 0.35)' : 'rgba(251, 191, 36, 0.18)'}
                           stroke={isHovered ? '#ffffff' : '#fbbf24'}
-                          strokeWidth={1 / zoom}
+                          strokeWidth={1.1 * iPx}
                         />
 
                         {/* Main draggable yellow handle */}
                         <circle
-                          r={4.5 / zoom}
+                          r={4.8 * iPx}
                           fill={isHovered ? '#fde047' : '#fbbf24'}
                           stroke="#020617"
-                          strokeWidth={1.4 / zoom}
+                          strokeWidth={1.5 * iPx}
                         />
 
                         {/* Center crosshair dot */}
-                        <circle r={1.3 / zoom} fill="#020617" />
+                        <circle r={1.4 * iPx} fill="#020617" />
 
                         {/* Snap badge or point index */}
                         <text
-                          y={11 / zoom}
+                          y={12.5 * tPx}
                           textAnchor="middle"
                           fill="#fde68a"
                           stroke="#020617"
-                          strokeWidth={2.4 / zoom}
+                          strokeWidth={2.8 * tPx}
                           paintOrder="stroke"
-                          fontSize={7 / zoom}
-                          fontWeight="bold"
+                          fontSize={7.8 * tPx}
+                          fontWeight="800"
                           className="pointer-events-none"
                         >
                           {pt.snapLabel ? `📍 ${pt.snapLabel}` : `#${idx + 1}`}
